@@ -1,52 +1,131 @@
 # Blitztext for Windows
 
-Experimental Windows MVP port of [cmagnussen/blitztext-app](https://github.com/cmagnussen/blitztext-app).
+Blitztext for Windows is an experimental native Windows app for turning speech into text. It is a .NET 8 WPF tray app inspired by the MIT-licensed macOS preview [cmagnussen/blitztext-app](https://github.com/cmagnussen/blitztext-app), but rebuilt for Windows.
 
-This is a native .NET 8 WPF tray app for speech-to-text workflows:
+## Funktionen
 
-- **Blitztext**: record speech and transcribe it.
-- **Blitztext+**: transcribe and improve the text.
-- **Blitztext Ärger raus**: turn frustrated speech into a calmer message.
-- **Blitztext :)**: add fitting emojis.
+- **Blitztext**: Sprache aufnehmen und transkribieren.
+- **Text verbessern**: Sprache aufnehmen, transkribieren und als saubereren Text formulieren.
+- **Ärger beruhigen**: emotional gesprochene Gedanken in eine klare, respektvolle Nachricht umwandeln.
+- **Emoji ergänzen**: Text transkribieren und passende Emojis ergänzen.
+- **Desktop-Leiste**: kleine schwebende Leiste mit drei Aufnahme-Buttons.
+- **Hotkeys**: frei konfigurierbare globale Tastenkombinationen.
+- **Mikrofonwahl**: Aufnahmegerät in den Einstellungen auswählen.
 
-## Preview Notes
+## Wichtig
 
 - Windows only.
-- Bring your own OpenAI API key.
-- No hosted Blitztext backend is included or used.
-- Audio and rewrite text are sent directly from this PC to the OpenAI API.
-- The API key is stored locally using Windows DPAPI, not in `settings.json`.
-- Local Whisper/offline transcription is intentionally not included in this MVP.
+- Kein eigener Server, keine Serveradresse.
+- Jeder Benutzer trägt seinen eigenen OpenAI API Key lokal in der App ein.
+- Audio und Text werden direkt vom eigenen PC an die OpenAI API gesendet.
+- Der OpenAI API Key wird lokal per Windows DPAPI unter dem Benutzerkonto gespeichert.
+- Der API Key wird nicht in `settings.json`, nicht im Repo und nicht im Build-Output gespeichert.
+- Lokale/offline Transkription ist in diesem MVP noch nicht enthalten.
 
-## Build
+## Voraussetzungen
 
-Install the .NET 8 SDK, then run:
+- Windows 10/11
+- Für Entwicklung/Build: [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- Für die Nutzung: eigener OpenAI API Key mit Zugriff auf Audio-Transkription und Chat-Completions/Chat-Modelle
+
+## Starten als Benutzer
+
+Wenn bereits ein Build vorhanden ist:
+
+```powershell
+.\Start-Blitztext.cmd
+```
+
+Oder direkt:
+
+```powershell
+.\publish\Blitztext.Windows-self-contained\Blitztext.Windows.exe
+```
+
+Beim ersten Start:
+
+1. OpenAI API Key in den Einstellungen speichern.
+2. Mikrofon auswählen.
+3. Entweder Desktop-Leiste verwenden oder Hotkeys konfigurieren.
+
+## Bauen aus dem Repo
 
 ```powershell
 dotnet restore
 dotnet test
-dotnet publish .\Blitztext.Windows\Blitztext.Windows.csproj -c Release -r win-x64 --self-contained false -o .\publish\Blitztext.Windows
+dotnet publish .\Blitztext.Windows\Blitztext.Windows.csproj -c Release -r win-x64 --self-contained true -o .\publish\Blitztext.Windows-self-contained
 ```
 
-Run `Blitztext.Windows.exe` from the publish folder. The app starts in the Windows notification area.
-
-For a build that also works on machines without the .NET 8 Desktop Runtime installed:
+Danach starten:
 
 ```powershell
-dotnet publish .\Blitztext.Windows\Blitztext.Windows.csproj -c Release -r win-x64 --self-contained true -o .\publish\Blitztext.Windows-self-contained
+.\publish\Blitztext.Windows-self-contained\Blitztext.Windows.exe
+```
+
+Optional eine Desktop-Verknüpfung erstellen:
+
+```powershell
+.\Install-Blitztext-Shortcut.cmd
 ```
 
 ## Hotkeys
 
-Defaults:
+Standardwerte:
 
 - `Ctrl+Shift+Space`: Blitztext
-- `Ctrl+Shift+1`: Blitztext+
-- `Ctrl+Shift+2`: Blitztext Ärger raus
-- `Ctrl+Shift+3`: Blitztext :)
+- `Ctrl+Shift+1`: Text verbessern
+- `Ctrl+Shift+2`: Ärger beruhigen
+- `Ctrl+Shift+3`: Emoji ergänzen
 
-The app supports toggle mode and hold mode. Toggle mode starts on the first press and stops on the second press. Hold mode records while the hotkey is held and processes when it is released.
+In den Einstellungen können Hotkeys neu aufgenommen werden: ins Feld klicken, gewünschte Kombination drücken, speichern.
+
+## Was darf auf GitHub?
+
+Du kannst hochladen:
+
+- `Blitztext.sln`
+- `Blitztext.Core/`
+- `Blitztext.Windows/`
+- `Blitztext.Tests/`
+- `README.md`
+- `LICENSE`
+- `.gitignore`
+- `Start-Blitztext.cmd`
+- `Install-Blitztext-Shortcut.cmd`
+
+Nicht hochladen:
+
+- `publish/`
+- `bin/`
+- `obj/`
+- `.vs/`
+- `.env` oder `.env.*`
+- `openai.key`
+- `settings.json`
+- `blitztext.log`
+- echte OpenAI API Keys oder Screenshots, auf denen Keys sichtbar sind
+
+Die `.gitignore` ist bereits so eingestellt, dass Build-Artefakte und typische lokale Secret-/Settings-Dateien ignoriert werden.
+
+Vor dem Push kannst du prüfen:
+
+```powershell
+git status --short
+rg "sk-" .
+```
+
+`rg "sk-" .` sollte keinen echten API Key finden. Testdaten sollten nie wie echte OpenAI Keys aussehen.
+
+## Lokale Daten
+
+Blitztext legt lokale Benutzerdaten unter `%AppData%\Blitztext\` ab, zum Beispiel:
+
+- `settings.json`: App-Einstellungen ohne API Key
+- `openai.key`: DPAPI-geschützter API-Key-Speicher
+- `blitztext.log`: lokales Diagnose-Log
+
+Diese Dateien gehören nicht ins Repo.
 
 ## Attribution
 
-The product idea, workflow names, and prompt behavior are adapted from the MIT-licensed macOS preview at `cmagnussen/blitztext-app`. This Windows codebase is a native rebuild because the original app depends on SwiftUI, AppKit, macOS Keychain, CoreGraphics paste events, and WhisperKit/CoreML.
+Die Idee, Workflow-Namen und Prompt-Richtung sind vom macOS-Projekt [cmagnussen/blitztext-app](https://github.com/cmagnussen/blitztext-app) inspiriert. Diese Windows-Codebasis ist ein nativer Neubau, weil das Original SwiftUI, AppKit, macOS Keychain, CoreGraphics-Paste-Events und WhisperKit/CoreML verwendet.
