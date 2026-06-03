@@ -79,6 +79,42 @@ Standardwerte:
 
 In den Einstellungen können Hotkeys neu aufgenommen werden: ins Feld klicken, gewünschte Kombination drücken, speichern.
 
+## Was darf auf GitHub?
+
+Du kannst hochladen:
+
+- `Blitztext.sln`
+- `Blitztext.Core/`
+- `Blitztext.Windows/`
+- `Blitztext.Tests/`
+- `README.md`
+- `LICENSE`
+- `.gitignore`
+- `Start-Blitztext.cmd`
+- `Install-Blitztext-Shortcut.cmd`
+
+Nicht hochladen:
+
+- `publish/`
+- `bin/`
+- `obj/`
+- `.vs/`
+- `.env` oder `.env.*`
+- `openai.key`
+- `settings.json`
+- `blitztext.log`
+- echte OpenAI API Keys oder Screenshots, auf denen Keys sichtbar sind
+
+Die `.gitignore` ist bereits so eingestellt, dass Build-Artefakte und typische lokale Secret-/Settings-Dateien ignoriert werden.
+
+Vor dem Push kannst du prüfen:
+
+```powershell
+git status --short
+rg "sk-" .
+```
+
+`rg "sk-" .` sollte keinen echten API Key finden. Testdaten sollten nie wie echte OpenAI Keys aussehen.
 
 ## Lokale Daten
 
@@ -88,6 +124,7 @@ Blitztext legt lokale Benutzerdaten unter `%AppData%\Blitztext\` ab, zum Beispie
 - `openai.key`: DPAPI-geschützter API-Key-Speicher
 - `blitztext.log`: lokales Diagnose-Log
 
+Diese Dateien gehören nicht ins Repo.
 
 ## Attribution
 

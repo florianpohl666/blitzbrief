@@ -1,0 +1,15 @@
+bin/
+obj/
+.vs/
+.vscode/
+TestResults/
+publish/
+*.user
+*.suo
+*.nupkg
+.env
+.env.*
+*.key
+openai.key
+settings.json
+blitztext.log
