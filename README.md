@@ -1,10 +1,10 @@
-# Blitztext for Windows
+﻿# BlitzBrief for Windows
 
-Blitztext for Windows is an experimental native Windows app for turning speech into text. It is a .NET 8 WPF tray app inspired by the MIT-licensed macOS preview [cmagnussen/blitztext-app](https://github.com/cmagnussen/blitztext-app), but rebuilt for Windows.
+BlitzBrief for Windows is an experimental native Windows app for turning speech into text. It is a .NET 8 WPF tray app inspired by the MIT-licensed macOS preview [cmagnussen/BlitzBrief-app](https://github.com/cmagnussen/BlitzBrief-app), but rebuilt for Windows.
 
 ## Funktionen
 
-- **Blitztext**: Sprache aufnehmen und transkribieren.
+- **BlitzBrief**: Sprache aufnehmen und transkribieren.
 - **Text verbessern**: Sprache aufnehmen, transkribieren und als saubereren Text formulieren.
 - **Ärger beruhigen**: emotional gesprochene Gedanken in eine klare, respektvolle Nachricht umwandeln.
 - **Emoji ergänzen**: Text transkribieren und passende Emojis ergänzen.
@@ -33,13 +33,13 @@ Blitztext for Windows is an experimental native Windows app for turning speech i
 Wenn bereits ein Build vorhanden ist:
 
 ```powershell
-.\Start-Blitztext.cmd
+.\Start-BlitzBrief.cmd
 ```
 
 Oder direkt:
 
 ```powershell
-.\publish\Blitztext.Windows-self-contained\Blitztext.Windows.exe
+.\publish\BlitzBrief.Windows-self-contained\BlitzBrief.Windows.exe
 ```
 
 Beim ersten Start:
@@ -53,26 +53,26 @@ Beim ersten Start:
 ```powershell
 dotnet restore
 dotnet test
-dotnet publish .\Blitztext.Windows\Blitztext.Windows.csproj -c Release -r win-x64 --self-contained true -o .\publish\Blitztext.Windows-self-contained
+dotnet publish .\BlitzBrief.Windows\BlitzBrief.Windows.csproj -c Release -r win-x64 --self-contained true -o .\publish\BlitzBrief.Windows-self-contained
 ```
 
 Danach starten:
 
 ```powershell
-.\publish\Blitztext.Windows-self-contained\Blitztext.Windows.exe
+.\publish\BlitzBrief.Windows-self-contained\BlitzBrief.Windows.exe
 ```
 
 Optional eine Desktop-Verknüpfung erstellen:
 
 ```powershell
-.\Install-Blitztext-Shortcut.cmd
+.\Install-BlitzBrief-Shortcut.cmd
 ```
 
 ## Hotkeys
 
 Standardwerte:
 
-- `Ctrl+Shift+Space`: Blitztext
+- `Ctrl+Shift+Space`: BlitzBrief
 - `Ctrl+Shift+1`: Text verbessern
 - `Ctrl+Shift+2`: Ärger beruhigen
 - `Ctrl+Shift+3`: Emoji ergänzen
@@ -82,4 +82,4 @@ In den Einstellungen können Hotkeys neu aufgenommen werden: ins Feld klicken, g
 
 ## Attribution
 
-Die Idee, Workflow-Namen und Prompt-Richtung sind vom macOS-Projekt [cmagnussen/blitztext-app](https://github.com/cmagnussen/blitztext-app) inspiriert. Diese Windows-Codebasis ist ein nativer Neubau, weil das Original SwiftUI, AppKit, macOS Keychain, CoreGraphics-Paste-Events und WhisperKit/CoreML verwendet.
+Die Idee, Workflow-Namen und Prompt-Richtung sind vom macOS-Projekt [cmagnussen/BlitzBrief-app](https://github.com/cmagnussen/BlitzBrief-app) inspiriert. Diese Windows-Codebasis ist ein nativer Neubau, weil das Original SwiftUI, AppKit, macOS Keychain, CoreGraphics-Paste-Events und WhisperKit/CoreML verwendet.

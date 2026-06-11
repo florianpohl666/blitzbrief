@@ -1,0 +1,248 @@
+﻿<Window x:Class="BlitzBrief.Windows.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="BlitzBrief Einstellungen - Windows MVP"
+        Width="760"
+        Height="860"
+        MinWidth="680"
+        MinHeight="720"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F7FA"
+        FontFamily="Segoe UI"
+        FontSize="13">
+  <Window.Resources>
+    <SolidColorBrush x:Key="TextMain" Color="#17202A" />
+    <SolidColorBrush x:Key="TextMuted" Color="#5F6B7A" />
+    <SolidColorBrush x:Key="PanelBorder" Color="#D8DEE8" />
+    <SolidColorBrush x:Key="Primary" Color="#2563EB" />
+
+    <Style TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource TextMain}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="PageTitle" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="26" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+
+    <Style x:Key="SectionTitle" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="17" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+
+    <Style x:Key="Description" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+      <Setter Property="LineHeight" Value="19" />
+      <Setter Property="Margin" Value="0,0,0,14" />
+    </Style>
+
+    <Style x:Key="FieldLabel" TargetType="TextBlock">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,0,0,5" />
+    </Style>
+
+    <Style x:Key="Panel" TargetType="Border">
+      <Setter Property="Background" Value="White" />
+      <Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="18" />
+      <Setter Property="Margin" Value="0,0,0,14" />
+    </Style>
+
+    <Style TargetType="TextBox">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="9,6" />
+      <Setter Property="BorderBrush" Value="#C9D2DF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Background" Value="White" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style TargetType="PasswordBox">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="9,6" />
+      <Setter Property="BorderBrush" Value="#C9D2DF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Background" Value="White" />
+    </Style>
+
+    <Style TargetType="ComboBox">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="6,4" />
+      <Setter Property="BorderBrush" Value="#C9D2DF" />
+    </Style>
+
+    <Style TargetType="Button">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="BorderBrush" Value="#C9D2DF" />
+      <Setter Property="Background" Value="#F8FAFC" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Background" Value="{StaticResource Primary}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Primary}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+  </Window.Resources>
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="24" Orientation="Vertical">
+      <TextBlock Text="BlitzBrief Einstellungen" Style="{StaticResource PageTitle}" />
+      <TextBlock Text="Windows MVP - aktualisierte Oberfläche" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10" />
+      <TextBlock Text="Lege deinen lokalen OpenAI API Key ab, passe Hotkeys an und bestimme, wie die vier Diktierfunktionen arbeiten." Style="{StaticResource Description}" />
+
+      <Border Style="{StaticResource Panel}">
+        <StackPanel>
+          <TextBlock Text="Zugang" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="Der API Key wird nur auf diesem Windows-Benutzerkonto gespeichert. BlitzBrief nutzt keinen eigenen Server und keine Serveradresse." Style="{StaticResource Description}" />
+          <TextBlock x:Name="ApiKeyStatusText" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <PasswordBox x:Name="ApiKeyBox" Grid.Column="0" />
+            <Button Grid.Column="1" Content="Aus Zwischenablage" Margin="8,0,0,0" Click="PasteApiKey_Click" />
+            <Button Grid.Column="2" Content="Key speichern" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" Click="SaveApiKey_Click" />
+            <Button Grid.Column="3" Content="L&#x00F6;schen" Margin="8,0,0,0" Click="DeleteApiKey_Click" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Panel}">
+        <StackPanel>
+          <TextBlock Text="Allgemein" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="Sprache und Transkriptionsmodell gelten f&#x00FC;r alle Workflows. Auto-Paste legt das Ergebnis in die Zwischenablage und sendet anschlie&#x00DF;end Strg+V." Style="{StaticResource Description}" />
+          <StackPanel>
+            <StackPanel Margin="0,0,0,12">
+              <TextBlock Text="Sprache" Style="{StaticResource FieldLabel}" />
+              <TextBox x:Name="LanguageBox" />
+              <TextBlock Text="Beispiel: de, en oder leer f&#x00FC;r automatische Erkennung." Style="{StaticResource Description}" Margin="0,6,0,0" />
+            </StackPanel>
+
+            <StackPanel Margin="0,0,0,12">
+              <TextBlock Text="Transkriptionsmodell" Style="{StaticResource FieldLabel}" />
+              <ComboBox x:Name="TranscriptionModelBox" IsEditable="True">
+                <ComboBoxItem Content="gpt-4o-mini-transcribe" />
+                <ComboBoxItem Content="gpt-4o-transcribe" />
+                <ComboBoxItem Content="whisper-1" />
+              </ComboBox>
+            </StackPanel>
+
+            <StackPanel Margin="0,0,0,12">
+              <TextBlock Text="Aufnahmemodus" Style="{StaticResource FieldLabel}" />
+              <ComboBox x:Name="HotkeyModeBox">
+                <ComboBoxItem Content="Toggle" />
+                <ComboBoxItem Content="Halten" />
+              </ComboBox>
+              <TextBlock Text="Toggle: einmal dr&#x00FC;cken zum Starten, erneut dr&#x00FC;cken zum Stoppen. Halten: aufnehmen, solange der Hotkey gedr&#x00FC;ckt bleibt." Style="{StaticResource Description}" Margin="0,6,0,0" />
+            </StackPanel>
+
+            <StackPanel>
+              <CheckBox x:Name="AutoPasteBox" Content="Nach Ergebnis automatisch mit Strg+V einf&#x00FC;gen" />
+            </StackPanel>
+
+            <StackPanel Margin="0,14,0,0">
+              <TextBlock Text="Mikrofon" Style="{StaticResource FieldLabel}" />
+              <TextBlock Text="Wähle das Aufnahmegerät, das BlitzBrief für Diktate verwenden soll." Style="{StaticResource Description}" Margin="0,0,0,8" />
+              <ComboBox x:Name="MicrophoneBox" DisplayMemberPath="Name" SelectedValuePath="Index" Margin="0,0,0,8" />
+              <TextBlock x:Name="MicrophoneStatusText" Text="Noch nicht geprüft." Style="{StaticResource Description}" Margin="0,0,0,8" />
+              <Button Content="Mikrofone neu laden" Width="170" Click="CheckMicrophone_Click" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Panel}">
+        <StackPanel>
+          <TextBlock Text="Hotkeys" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="Diese Tastenkombinationen funktionieren global, also auch aus anderen Programmen heraus. Klicke in ein Feld und dr&#x00FC;cke die gew&#x00FC;nschte Kombination, zum Beispiel Strg+Alt+B." Style="{StaticResource Description}" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="210" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="BlitzBrief" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="TranscriptionHotkeyBox" Grid.Row="0" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
+            <Button Grid.Row="0" Grid.Column="2" Content="Zur&#x00FC;cksetzen" Margin="0,0,0,8" Click="ResetHotkeys_Click" />
+            <TextBlock Text="Text verbessern" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="TextImproverHotkeyBox" Grid.Row="1" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
+            <TextBlock Text="&#x00C4;rger beruhigen" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="DampfHotkeyBox" Grid.Row="2" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
+            <TextBlock Text="Emoji erg&#x00E4;nzen" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="EmojiHotkeyBox" Grid.Row="3" Grid.Column="1" Margin="0,0,8,0" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
+          </Grid>
+          <TextBlock x:Name="HotkeyHelpText" Text="Mindestens Strg, Alt, Umschalt oder Windows-Taste plus eine weitere Taste verwenden." Style="{StaticResource Description}" Margin="0,10,0,0" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Panel}">
+        <StackPanel>
+          <TextBlock Text="Text verbessern" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="Nimmt Sprache auf, transkribiert sie und formuliert daraus sauberen, besser lesbaren Text." Style="{StaticResource Description}" />
+          <TextBlock Text="Schreibstil" Style="{StaticResource FieldLabel}" />
+          <ComboBox x:Name="ToneBox" Margin="0,0,0,10">
+            <ComboBoxItem Content="Formell" />
+            <ComboBoxItem Content="Neutral" />
+            <ComboBoxItem Content="Locker" />
+          </ComboBox>
+          <TextBlock Text="Kontext" Style="{StaticResource FieldLabel}" />
+          <TextBox x:Name="ContextBox" Margin="0,0,0,10" />
+          <TextBlock Text="Eigene Anweisung" Style="{StaticResource FieldLabel}" />
+          <TextBox x:Name="TextPromptBox" MinHeight="86" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Panel}">
+        <StackPanel>
+          <TextBlock Text="&#x00C4;rger beruhigen" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="Nimmt emotional gesprochene Gedanken auf und macht daraus eine klare, respektvolle Nachricht mit gleichem Anliegen." Style="{StaticResource Description}" />
+          <TextBlock Text="Anweisung" Style="{StaticResource FieldLabel}" />
+          <TextBox x:Name="DampfPromptBox" MinHeight="118" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Panel}">
+        <StackPanel>
+          <TextBlock Text="Emoji erg&#x00E4;nzen" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="Transkribiert Sprache, korrigiert offensichtliche Fehler und setzt je nach Dichte passende Emojis in den Text." Style="{StaticResource Description}" />
+          <TextBlock Text="Emoji-Dichte" Style="{StaticResource FieldLabel}" />
+          <ComboBox x:Name="EmojiDensityBox">
+            <ComboBoxItem Content="Wenig" />
+            <ComboBoxItem Content="Mittel" />
+            <ComboBoxItem Content="Viel" />
+          </ComboBox>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Panel}">
+        <StackPanel>
+          <TextBlock Text="Eigennamen und Begriffe" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="Ein Begriff pro Zeile. Diese Hinweise helfen bei Namen, Fachbegriffen, Produkten und Projekten." Style="{StaticResource Description}" />
+          <TextBox x:Name="CustomTermsBox" MinHeight="84" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" />
+        </StackPanel>
+      </Border>
+
+      <DockPanel Margin="0,4,0,18">
+        <TextBlock x:Name="SaveStatusText" Foreground="#1D7A3A" VerticalAlignment="Center" />
+        <Button DockPanel.Dock="Right" Content="Speichern" Width="160" Style="{StaticResource PrimaryButton}" Click="SaveSettings_Click" />
+      </DockPanel>
+    </StackPanel>
+  </ScrollViewer>
+</Window>
