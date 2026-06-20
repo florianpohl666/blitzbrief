@@ -15,6 +15,19 @@ public sealed class AppSettings
     public string RewriteModel { get; set; } = "gpt-4o-mini";
     public int AudioInputDeviceNumber { get; set; } = 0;
     public bool AutoPaste { get; set; } = true;
+    public bool AutoPasteDelay { get; set; } = false;
+
+    /// <summary>
+    /// Hält das Mikrofon durchgehend in einem kurzen Ringpuffer aktiv, damit das Diktat
+    /// verzögerungsfrei startet und Wortanfänge nicht verloren gehen. Bedeutet: Mikrofon ist dauerhaft aktiv.
+    /// </summary>
+    public bool PreRollEnabled { get; set; } = true;
+    public int PreRollMilliseconds { get; set; } = 300;
+
+    /// <summary>Diktat per Doppeltipp auf einen Modifier starten/stoppen (Wispr-Flow-Stil).</summary>
+    public bool DoubleTapEnabled { get; set; } = true;
+    public ModifierKey DoubleTapModifier { get; set; } = ModifierKey.Ctrl;
+    public bool DebugMode { get; set; } = false;
 
     public static Dictionary<WorkflowType, string> DefaultHotkeys() => new()
     {
@@ -32,11 +45,20 @@ public sealed class TextImprovementSettings
     public TextTone Tone { get; set; } = TextTone.Neutral;
 }
 
+public enum ModifierKey
+{
+    Ctrl,
+    Alt,
+    Shift
+}
+
 public enum TextTone
 {
     Formal,
     Neutral,
-    Casual
+    Casual,
+    JornMinimal,
+    JornCommands
 }
 
 public sealed class DampfAblassenSettings

@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace BlitzBrief.Core.OpenAI;
 
@@ -12,7 +13,7 @@ public sealed class OpenAIClient(HttpClient? httpClient = null) : IOpenAIClient
         string audioPath,
         string apiKey,
         string language,
-        IReadOnlyList<string> customTerms,
+        string? whisperPrompt,
         string model,
         CancellationToken cancellationToken)
     {
@@ -32,9 +33,9 @@ public sealed class OpenAIClient(HttpClient? httpClient = null) : IOpenAIClient
             form.Add(new StringContent(language.Trim()), "language");
         }
 
-        if (customTerms.Count > 0)
+        if (!string.IsNullOrWhiteSpace(whisperPrompt))
         {
-            form.Add(new StringContent($"Eigennamen und Begriffe: {string.Join(", ", customTerms)}"), "prompt");
+            form.Add(new StringContent(whisperPrompt), "prompt");
         }
 
         request.Content = form;
@@ -65,18 +66,16 @@ public sealed class OpenAIClient(HttpClient? httpClient = null) : IOpenAIClient
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-        var payload = new
-        {
+        var payload = new ChatCompletionRequest(
             model,
             temperature,
-            messages = new[]
-            {
-                new { role = "system", content = systemPrompt },
-                new { role = "user", content = text }
-            }
-        };
+            [
+                new ChatMessage("system", systemPrompt),
+                new ChatMessage("user", text)
+            ]);
 
-        request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var json = JsonSerializer.Serialize(payload, OpenAIJsonContext.Default.ChatCompletionRequest);
+        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
         using var response = await http.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
@@ -115,3 +114,11 @@ public sealed class OpenAIClient(HttpClient? httpClient = null) : IOpenAIClient
 }
 
 public sealed class OpenAIException(string message) : Exception(message);
+
+internal sealed record ChatMessage(string Role, string Content);
+
+internal sealed record ChatCompletionRequest(string Model, double Temperature, ChatMessage[] Messages);
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(ChatCompletionRequest))]
+internal sealed partial class OpenAIJsonContext : JsonSerializerContext;

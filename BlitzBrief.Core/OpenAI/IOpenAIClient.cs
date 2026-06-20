@@ -8,7 +8,7 @@ public interface IOpenAIClient
         string audioPath,
         string apiKey,
         string language,
-        IReadOnlyList<string> customTerms,
+        string? whisperPrompt,
         string model,
         CancellationToken cancellationToken);
 

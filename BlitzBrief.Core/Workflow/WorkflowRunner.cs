@@ -10,7 +10,7 @@ public sealed class WorkflowRunner(
     ApiKeyStore apiKeyStore,
     Func<AppSettings> settingsProvider)
 {
-    public async Task<string> ProcessAsync(
+    public async Task<WorkflowResult> ProcessAsync(
         WorkflowType type,
         string audioPath,
         TimeSpan recordingDuration,
@@ -30,12 +30,16 @@ public sealed class WorkflowRunner(
 
         try
         {
-            var customTerms = recordingDuration.TotalSeconds >= 0.9 ? settings.CustomTerms : [];
+            var useCommandHints = type == WorkflowType.TextImprover &&
+                                  settings.TextImprovement.Tone == TextTone.JornCommands;
+            var customTerms = recordingDuration.TotalSeconds >= 0.9 ? settings.CustomTerms : (IReadOnlyList<string>)[];
+            var whisperPrompt = PromptBuilder.BuildWhisperPrompt(customTerms, includeCommandHints: useCommandHints);
+
             var rawText = await openAIClient.TranscribeAsync(
                 audioPath,
                 apiKey,
                 settings.Language,
-                customTerms,
+                whisperPrompt,
                 settings.TranscriptionModel,
                 cancellationToken);
 
@@ -45,32 +49,43 @@ public sealed class WorkflowRunner(
                 throw new InvalidOperationException("Keine Aufnahme erkannt.");
             }
 
-            return type switch
+            if (type == WorkflowType.Transcription)
             {
-                WorkflowType.Transcription => cleaned,
+                return new WorkflowResult(cleaned);
+            }
+
+            var stage1 = useCommandHints
+                ? TranscriptionQualityService.ProcessJornCommands(cleaned)
+                : cleaned;
+
+            var jornMode = settings.TextImprovement.Tone is TextTone.JornMinimal or TextTone.JornCommands;
+            var rewritten = type switch
+            {
                 WorkflowType.TextImprover => await RewriteAsync(
-                    cleaned,
+                    stage1,
                     apiKey,
                     PromptBuilder.BuildTextImprovementPrompt(settings.TextImprovement, settings.CustomTerms),
                     settings.RewriteModel,
-                    0.3,
+                    jornMode ? 0.0 : 0.3,
                     cancellationToken),
                 WorkflowType.DampfAblassen => await RewriteAsync(
-                    cleaned,
+                    stage1,
                     apiKey,
                     settings.DampfAblassen.SystemPrompt,
                     "gpt-4o",
                     0.4,
                     cancellationToken),
                 WorkflowType.EmojiText => await RewriteAsync(
-                    cleaned,
+                    stage1,
                     apiKey,
                     PromptBuilder.BuildEmojiPrompt(settings.EmojiText.EmojiDensity),
                     settings.RewriteModel,
                     0.3,
                     cancellationToken),
-                _ => cleaned
+                _ => stage1
             };
+
+            return new WorkflowResult(rewritten, Stage1Transcript: stage1);
         }
         finally
         {
@@ -100,3 +115,5 @@ public sealed class WorkflowRunner(
         return TranscriptionQualityService.CleanedTranscript(rewritten);
     }
 }
+
+public sealed record WorkflowResult(string Text, string? Stage1Transcript = null);

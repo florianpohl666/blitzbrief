@@ -80,6 +80,3 @@ Standardwerte:
 In den Einstellungen können Hotkeys neu aufgenommen werden: ins Feld klicken, gewünschte Kombination drücken, speichern.
 
 
-## Attribution
-
-Die Idee, Workflow-Namen und Prompt-Richtung sind vom macOS-Projekt [cmagnussen/BlitzBrief-app](https://github.com/cmagnussen/BlitzBrief-app) inspiriert. Diese Windows-Codebasis ist ein nativer Neubau, weil das Original SwiftUI, AppKit, macOS Keychain, CoreGraphics-Paste-Events und WhisperKit/CoreML verwendet.

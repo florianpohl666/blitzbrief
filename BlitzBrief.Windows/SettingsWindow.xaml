@@ -149,6 +149,7 @@
 
             <StackPanel>
               <CheckBox x:Name="AutoPasteBox" Content="Nach Ergebnis automatisch mit Strg+V einf&#x00FC;gen" />
+              <CheckBox x:Name="AutoPasteDelayBox" Content="Verz&#x00F6;gerung vor Einf&#x00FC;gen (300 ms, f&#x00FC;r VMware/VM)" Margin="0,8,0,0" />
             </StackPanel>
 
             <StackPanel Margin="0,14,0,0">
@@ -179,16 +180,37 @@
               <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <TextBlock Text="BlitzBrief" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="TranscriptionHotkeyBox" Grid.Row="0" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
+            <TextBox x:Name="TranscriptionHotkeyBox" Grid.Row="0" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
             <Button Grid.Row="0" Grid.Column="2" Content="Zur&#x00FC;cksetzen" Margin="0,0,0,8" Click="ResetHotkeys_Click" />
             <TextBlock Text="Text verbessern" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="TextImproverHotkeyBox" Grid.Row="1" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
+            <TextBox x:Name="TextImproverHotkeyBox" Grid.Row="1" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
             <TextBlock Text="&#x00C4;rger beruhigen" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="DampfHotkeyBox" Grid.Row="2" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
+            <TextBox x:Name="DampfHotkeyBox" Grid.Row="2" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
             <TextBlock Text="Emoji erg&#x00E4;nzen" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="EmojiHotkeyBox" Grid.Row="3" Grid.Column="1" Margin="0,0,8,0" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
+            <TextBox x:Name="EmojiHotkeyBox" Grid.Row="3" Grid.Column="1" Margin="0,0,8,0" IsReadOnly="True" PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
           </Grid>
-          <TextBlock x:Name="HotkeyHelpText" Text="Mindestens Strg, Alt, Umschalt oder Windows-Taste plus eine weitere Taste verwenden." Style="{StaticResource Description}" Margin="0,10,0,0" />
+          <TextBlock x:Name="HotkeyHelpText" Text="Mindestens zwei Modifier-Tasten (Strg, Alt, Umschalt, Win) oder ein Modifier plus eine weitere Taste verwenden." Style="{StaticResource Description}" Margin="0,10,0,0" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Panel}">
+        <StackPanel>
+          <TextBlock Text="Schnellstart &amp; Latenz" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="Diktat per Doppeltipp auf einen Modifier starten und stoppen (Wispr-Flow-Stil). Der Pre-Roll-Puffer hält das Mikrofon aktiv, damit der Start verz&#x00F6;gerungsfrei ist und Wortanf&#x00E4;nge nicht verloren gehen." Style="{StaticResource Description}" />
+
+          <CheckBox x:Name="DoubleTapEnabledBox" Content="Diktat per Doppeltipp starten/stoppen" Margin="0,0,0,10" />
+          <StackPanel Margin="0,0,0,12">
+            <TextBlock Text="Doppeltipp-Taste" Style="{StaticResource FieldLabel}" />
+            <ComboBox x:Name="DoubleTapModifierBox" Width="200" HorizontalAlignment="Left">
+              <ComboBoxItem Content="Strg" />
+              <ComboBoxItem Content="Alt" />
+              <ComboBoxItem Content="Umschalt" />
+            </ComboBox>
+            <TextBlock Text="Tippe die gew&#x00E4;hlte Taste zweimal schnell an, um das Diktat zu starten; erneut zum Stoppen." Style="{StaticResource Description}" Margin="0,6,0,0" />
+          </StackPanel>
+
+          <CheckBox x:Name="PreRollEnabledBox" Content="Mikrofon vorab aktiv halten (verz&#x00F6;gerungsfreier Start)" />
+          <TextBlock Text="Hinweis: Bei aktivem Pre-Roll ist das Mikrofon dauerhaft aktiv. Ausschalten, falls das nicht gew&#x00FC;nscht ist." Style="{StaticResource Description}" Margin="0,6,0,0" />
         </StackPanel>
       </Border>
 
@@ -197,11 +219,102 @@
           <TextBlock Text="Text verbessern" Style="{StaticResource SectionTitle}" />
           <TextBlock Text="Nimmt Sprache auf, transkribiert sie und formuliert daraus sauberen, besser lesbaren Text." Style="{StaticResource Description}" />
           <TextBlock Text="Schreibstil" Style="{StaticResource FieldLabel}" />
-          <ComboBox x:Name="ToneBox" Margin="0,0,0,10">
-            <ComboBoxItem Content="Formell" />
-            <ComboBoxItem Content="Neutral" />
-            <ComboBoxItem Content="Locker" />
-          </ComboBox>
+          <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ComboBox x:Name="ToneBox" Grid.Column="0" SelectionChanged="ToneBox_SelectionChanged">
+              <ComboBoxItem Content="Formell" />
+              <ComboBoxItem Content="Neutral" />
+              <ComboBoxItem Content="Locker" />
+              <ComboBoxItem Content="Jörn 1 – Nur bereinigen" />
+              <ComboBoxItem Content="Jörn 2 – Bereinigen + Kommandos" />
+            </ComboBox>
+            <Border x:Name="CommandsInfoBadge"
+                    Grid.Column="1"
+                    Margin="8,0,0,0"
+                    Padding="9,5"
+                    Background="#EFF6FF"
+                    BorderBrush="#BFDBFE"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    VerticalAlignment="Center"
+                    Cursor="Help"
+                    Visibility="Collapsed">
+              <TextBlock Text="ℹ Kommandos" Foreground="#2563EB" FontSize="12" FontWeight="SemiBold">
+                <TextBlock.ToolTip>
+                  <ToolTip ToolTipService.ShowDuration="30000">
+                    <StackPanel Margin="2">
+                      <TextBlock Text="Sprachkommandos für Interpunktion" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,8" />
+                      <TextBlock Text="Spreche diese Wörter, um Satzzeichen einzufügen:" Foreground="#555" FontSize="12" Margin="0,0,0,6" />
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" />
+                          <ColumnDefinition Width="Auto" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="„Satzende&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="." Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="„Komma&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="1" Grid.Column="2" Text="," Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="„Semikolon&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="2" Grid.Column="2" Text=";" Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="„Doppelpunkt&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="3" Grid.Column="2" Text=":" Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="„Ausrufezeichen&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="4" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="4" Grid.Column="2" Text="!" Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="„Fragezeichen&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="5" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="5" Grid.Column="2" Text="?" Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="„Gedankenstrich&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="6" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="6" Grid.Column="2" Text="—" Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="7" Grid.Column="0" Text="„Anführungszeichen auf/zu&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="7" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="7" Grid.Column="2" Text="&quot; / &quot;" Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="8" Grid.Column="0" Text="„Klammer auf/zu&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="8" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="8" Grid.Column="2" Text="( / )" Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="9" Grid.Column="0" Text="„Absatz&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="9" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="9" Grid.Column="2" Text="Absatzumbruch" Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="10" Grid.Column="0" Text="„neue Zeile&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="10" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="10" Grid.Column="2" Text="Zeilenumbruch" Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="11" Grid.Column="0" Text="„Leerzeile&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="11" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="11" Grid.Column="2" Text="leere Zeile" Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="12" Grid.Column="0" Text="„Text einrücken&quot;" Margin="0,2,12,2" FontFamily="Consolas" />
+                        <TextBlock Grid.Row="12" Grid.Column="1" Text="→" Margin="0,2,8,2" Foreground="#888" />
+                        <TextBlock Grid.Row="12" Grid.Column="2" Text="Einrückung" Margin="0,2" FontFamily="Consolas" FontWeight="SemiBold" />
+                      </Grid>
+                    </StackPanel>
+                  </ToolTip>
+                </TextBlock.ToolTip>
+              </TextBlock>
+            </Border>
+          </Grid>
           <TextBlock Text="Kontext" Style="{StaticResource FieldLabel}" />
           <TextBox x:Name="ContextBox" Margin="0,0,0,10" />
           <TextBlock Text="Eigene Anweisung" Style="{StaticResource FieldLabel}" />
@@ -239,6 +352,14 @@
         </StackPanel>
       </Border>
 
+      <Border Style="{StaticResource Panel}">
+        <StackPanel>
+          <TextBlock Text="Entwickler" Style="{StaticResource SectionTitle}" />
+          <CheckBox x:Name="DebugModeBox" Content="Debug-Modus: Stufe 1 und Stufe 2 nach jedem Workflow anzeigen" />
+          <TextBlock Text="Nach dem Verarbeiten öffnet sich ein Fenster mit dem rohen Transkript (Stufe 1) und dem Rewrite-Ergebnis (Stufe 2) zum Vergleich." Style="{StaticResource Description}" Margin="0,6,0,0" />
+        </StackPanel>
+      </Border>
+
       <DockPanel Margin="0,4,0,18">
         <TextBlock x:Name="SaveStatusText" Foreground="#1D7A3A" VerticalAlignment="Center" />
         <Button DockPanel.Dock="Right" Content="Speichern" Width="160" Style="{StaticResource PrimaryButton}" Click="SaveSettings_Click" />
@@ -246,3 +367,4 @@
     </StackPanel>
   </ScrollViewer>
 </Window>
+

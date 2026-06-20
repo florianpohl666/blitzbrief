@@ -16,7 +16,7 @@ public sealed class WorkflowRunnerTests
 
         var result = await runner.ProcessAsync(WorkflowType.Transcription, audioPath, TimeSpan.FromSeconds(2), CancellationToken.None);
 
-        Assert.Equal("hallo welt", result);
+        Assert.Equal("hallo welt", result.Text);
         Assert.False(File.Exists(audioPath));
     }
 
@@ -29,7 +29,7 @@ public sealed class WorkflowRunnerTests
 
         var result = await runner.ProcessAsync(WorkflowType.TextImprover, audioPath, TimeSpan.FromSeconds(2), CancellationToken.None);
 
-        Assert.Equal("Hallo Welt.", result);
+        Assert.Equal("Hallo Welt.", result.Text);
         Assert.Contains("Eigennamen", client.LastRewritePrompt);
     }
 
@@ -75,13 +75,14 @@ public sealed class WorkflowRunnerTests
             string audioPath,
             string apiKey,
             string language,
-            IReadOnlyList<string> customTerms,
+            string? whisperPrompt,
             string model,
             CancellationToken cancellationToken)
         {
             Assert.True(File.Exists(audioPath));
             Assert.Equal("test-openai-key", apiKey);
-            Assert.Contains("Contoso", customTerms);
+            Assert.NotNull(whisperPrompt);
+            Assert.Contains("Contoso", whisperPrompt);
             return Task.FromResult(transcription);
         }
 

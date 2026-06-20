@@ -1,4 +1,4 @@
-﻿using BlitzBrief.Core.Settings;
+using BlitzBrief.Core.Settings;
 
 namespace BlitzBrief.Core;
 
@@ -33,6 +33,36 @@ public static class PromptBuilder
                normalized.Contains("noetige Dringlichkeit", StringComparison.Ordinal) ||
                normalized.Contains("loesungsorientiert", StringComparison.Ordinal) ||
                normalized.Contains("Gib NUR die fertige Nachricht zurueck", StringComparison.Ordinal);
+    }
+
+    public static string? BuildWhisperPrompt(IReadOnlyList<string> customTerms, bool includeCommandHints)
+    {
+        var parts = new List<string>();
+
+        if (customTerms.Count > 0)
+        {
+            // Begriffe als Fließtext-Beispiel – Whisper orientiert sich am Schreibstil,
+            // keine kommagetrennte Liste die als Kontext ungeeignet ist.
+            var termSentences = string.Join(" Satzende ", customTerms);
+            parts.Add(termSentences + " Satzende");
+        }
+
+        if (includeCommandHints)
+        {
+            // Mustertext zeigt Kommandowörter als normale Wörter im Fließtext,
+            // damit Whisper sie nicht eigenständig in Satzzeichen umwandelt.
+            parts.Add(
+                "Der Auskunftsanspruch ist begründet Komma da die Voraussetzungen vorliegen Satzende " +
+                "Die Eigentumsvormerkung wurde eingetragen Satzende Absatz " +
+                "Der Kaufpreisanspruch ist fällig Komma sobald die Übergabe erfolgt Satzende");
+        }
+
+        if (parts.Count == 0)
+        {
+            return null;
+        }
+
+        return string.Join(" ", parts);
     }
 
     public static string BuildTextImprovementPrompt(TextImprovementSettings settings, IReadOnlyList<string> customTerms)
@@ -70,6 +100,11 @@ public static class PromptBuilder
 
     private static string BuildDefaultImprovementPrompt(TextTone tone)
     {
+        if (tone == TextTone.JornMinimal)
+            return BuildJornMinimalPrompt();
+        if (tone == TextTone.JornCommands)
+            return BuildJornCommandsPrompt();
+
         var prompt = "Du bist ein Lektor und Schreibassistent. Verbessere den folgenden Text:\n" +
                      "- Korrigiere Rechtschreibung und Grammatik\n" +
                      "- Verbessere die Formulierung und den Lesefluss\n" +
@@ -85,4 +120,21 @@ public static class PromptBuilder
 
         return prompt;
     }
+
+    private static string BuildJornMinimalPrompt() =>
+        "Du erhältst ein gesprochenes Transkript. Deine Aufgabe:\n" +
+        "- Entferne Füllwörter (äh, ähm, halt, irgendwie, eigentlich, sozusagen, quasi, also, ne, oder so)\n" +
+        "- Korrigiere Grammatik- und Rechtschreibfehler\n" +
+        "- Formuliere NICHT um - behalte Wortwahl und Satzstruktur des Sprechers exakt bei\n" +
+        "- Gib NUR den bereinigten Text zurück, keine Erklärungen";
+
+    private static string BuildJornCommandsPrompt() =>
+        "Du erhältst ein gesprochenes Transkript. Satzzeichen wurden bereits durch Code ersetzt. Deine Aufgabe:\n" +
+        "- Entferne Füllwörter (äh, ähm, halt, irgendwie, eigentlich, sozusagen, quasi, also, ne, oder so)\n" +
+        "- Korrigiere offensichtliche Grammatik- und Rechtschreibfehler\n" +
+        "- Formuliere NICHT um – behalte Wortwahl und Satzstruktur des Sprechers exakt bei\n" +
+        "- Der Text kann ein vollständiger Satz, ein Halbsatz oder nur einzelne Wörter sein – ergänze NICHTS, vervollständige NICHTS\n" +
+        "- Behalte Groß-/Kleinschreibung am Anfang des Textes exakt wie im Transkript\n" +
+        "- Entferne KEINE vorhandenen Satzzeichen\n" +
+        "- Gib NUR den bereinigten Text zurück, keine Erklärungen";
 }

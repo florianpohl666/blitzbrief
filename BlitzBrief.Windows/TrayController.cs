@@ -22,6 +22,7 @@ public sealed class TrayController : IDisposable
     private readonly ClipboardPasteService clipboardPasteService = new();
     private SettingsWindow? settingsWindow;
     private FloatingToolbarWindow? floatingToolbarWindow;
+    private OverlayWindow? overlayWindow;
     private CancellationTokenSource? processingCts;
     private WorkflowType? activeWorkflow;
     private bool disposed;
@@ -47,6 +48,12 @@ public sealed class TrayController : IDisposable
         notifyIcon.DoubleClick += (_, _) => ShowSettings();
         hotkeyManager.HotkeyPressed += OnHotkeyPressed;
         hotkeyManager.HotkeyReleased += OnHotkeyReleased;
+        hotkeyManager.DoubleTapDetected += (_, type) =>
+        {
+            AppLog.Write($"DoubleTapDetected type={type}");
+            ToggleWorkflow(type);
+        };
+        audioRecorder.AudioLevelChanged += (_, level) => overlayWindow?.SetLevel(level);
     }
 
     public void Start()
@@ -54,9 +61,22 @@ public sealed class TrayController : IDisposable
         AppLog.Write("TrayController.Start");
         notifyIcon.Visible = true;
         RegisterHotkeys();
+        ConfigureAudio();
         SetStatus("BlitzBrief bereit");
         ShowFloatingToolbar();
         ShowSettings();
+    }
+
+    private void ConfigureAudio()
+    {
+        try
+        {
+            audioRecorder.Configure(settings.AudioInputDeviceNumber, settings.PreRollEnabled, settings.PreRollMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write($"ConfigureAudio failed: {ex}");
+        }
     }
 
     private Forms.ContextMenuStrip BuildMenu()
@@ -83,6 +103,8 @@ public sealed class TrayController : IDisposable
                 notifyIcon.ShowBalloonTip(4500, "BlitzBrief Hotkey", error, Forms.ToolTipIcon.Warning);
             }
         }
+
+        hotkeyManager.ConfigureDoubleTap(settings.DoubleTapEnabled, settings.DoubleTapModifier, WorkflowType.Transcription);
     }
 
     private void OnHotkeyPressed(object? sender, WorkflowType type)
@@ -142,10 +164,10 @@ public sealed class TrayController : IDisposable
         {
             processingCts?.Cancel();
             processingCts = new CancellationTokenSource();
-            audioRecorder.Start(settings.AudioInputDeviceNumber);
+            audioRecorder.Arm();
             activeWorkflow = type;
             SetStatus($"{type.DisplayName()}: Aufnahme läuft");
-            notifyIcon.ShowBalloonTip(1200, "BlitzBrief", "Aufnahme läuft.", Forms.ToolTipIcon.Info);
+            ShowOverlayListening(type.DisplayName());
             AppLog.Write($"StartRecording succeeded type={type}");
         }
         catch (Exception ex)
@@ -172,22 +194,40 @@ public sealed class TrayController : IDisposable
             var recording = audioRecorder.Stop();
             audioPath = recording.Path;
             SetStatus($"{type.DisplayName()}: wird verarbeitet");
+            ShowOverlayProcessing();
             var result = await workflowRunner.ProcessAsync(type, recording.Path, recording.Duration, token);
-            clipboardPasteService.CopyText(result);
+            AppLog.Write($"StopAndProcess result chars={result.Text.Length} preview={result.Text[..Math.Min(60, result.Text.Length)]}");
+            clipboardPasteService.CopyText(result.Text);
             if (settings.AutoPaste)
             {
-                clipboardPasteService.Paste();
+                if (settings.AutoPasteDelay)
+                {
+                    await Task.Delay(300, token);
+                }
+                await clipboardPasteService.PasteAsync(token);
             }
 
+            HideOverlay();
             SetStatus($"{type.DisplayName()}: fertig");
-            notifyIcon.ShowBalloonTip(2500, "BlitzBrief", "Text ist in der Zwischenablage.", Forms.ToolTipIcon.Info);
+
+            if (settings.DebugMode && result.Stage1Transcript is not null)
+            {
+                var s1 = result.Stage1Transcript;
+                var s2 = result.Text;
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    new DebugOutputWindow(s1, s2).Show());
+            }
         }
         catch (OperationCanceledException)
         {
+            AppLog.Write($"StopAndProcess cancelled type={type}");
+            HideOverlay();
             SetStatus("BlitzBrief bereit");
         }
         catch (Exception ex)
         {
+            AppLog.Write($"StopAndProcess error type={type}: {ex}");
+            HideOverlay();
             SetStatus("Fehler");
             notifyIcon.ShowBalloonTip(6000, "BlitzBrief", ex.Message, Forms.ToolTipIcon.Error);
             if (audioPath is not null && File.Exists(audioPath))
@@ -206,6 +246,7 @@ public sealed class TrayController : IDisposable
         processingCts?.Cancel();
         audioRecorder.Cancel();
         activeWorkflow = null;
+        HideOverlay();
         SetStatus("BlitzBrief bereit");
     }
 
@@ -222,6 +263,7 @@ public sealed class TrayController : IDisposable
                 settingsWindow.SettingsSaved += (_, _) =>
                 {
                     RegisterHotkeys();
+                    ConfigureAudio();
                     SetStatus("Einstellungen gespeichert");
                 };
                 settingsWindow.Closed += (_, _) => settingsWindow = null;
@@ -268,8 +310,26 @@ public sealed class TrayController : IDisposable
 
             floatingToolbarWindow.WindowState = WindowState.Normal;
             floatingToolbarWindow.Topmost = true;
-            floatingToolbarWindow.Activate();
         });
+    }
+
+    private void ShowOverlayListening(string label)
+    {
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            overlayWindow ??= new OverlayWindow();
+            overlayWindow.ShowListening(label);
+        });
+    }
+
+    private void ShowOverlayProcessing()
+    {
+        System.Windows.Application.Current.Dispatcher.Invoke(() => overlayWindow?.ShowProcessing("Wird verarbeitet"));
+    }
+
+    private void HideOverlay()
+    {
+        System.Windows.Application.Current.Dispatcher.Invoke(() => overlayWindow?.HideOverlay());
     }
 
     private void SetStatus(string text)
@@ -293,6 +353,7 @@ public sealed class TrayController : IDisposable
         processingCts?.Cancel();
         audioRecorder.Dispose();
         hotkeyManager.Dispose();
+        overlayWindow?.Close();
         floatingToolbarWindow?.Close();
         settingsWindow?.Close();
         notifyIcon.Visible = false;

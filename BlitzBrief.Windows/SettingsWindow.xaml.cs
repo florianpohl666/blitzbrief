@@ -16,6 +16,9 @@ public partial class SettingsWindow : Window
 
     public event EventHandler? SettingsSaved;
 
+    private ModifierKeys _captureModifiersPeak;
+    private bool _captureHadNonModifier;
+
     public SettingsWindow(AppSettings settings, SettingsStore settingsStore, ApiKeyStore apiKeyStore)
     {
         InitializeComponent();
@@ -35,6 +38,16 @@ public partial class SettingsWindow : Window
         TranscriptionModelBox.Text = settings.TranscriptionModel;
         HotkeyModeBox.SelectedIndex = settings.HotkeyMode == HotkeyMode.Hold ? 1 : 0;
         AutoPasteBox.IsChecked = settings.AutoPaste;
+        AutoPasteDelayBox.IsChecked = settings.AutoPasteDelay;
+        DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
+        DoubleTapModifierBox.SelectedIndex = settings.DoubleTapModifier switch
+        {
+            ModifierKey.Alt => 1,
+            ModifierKey.Shift => 2,
+            _ => 0
+        };
+        PreRollEnabledBox.IsChecked = settings.PreRollEnabled;
+        DebugModeBox.IsChecked = settings.DebugMode;
         TranscriptionHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.Transcription];
         TextImproverHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.TextImprover];
         DampfHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.DampfAblassen];
@@ -43,6 +56,8 @@ public partial class SettingsWindow : Window
         {
             TextTone.Formal => 0,
             TextTone.Casual => 2,
+            TextTone.JornMinimal => 3,
+            TextTone.JornCommands => 4,
             _ => 1
         };
         ContextBox.Text = settings.TextImprovement.Context;
@@ -57,7 +72,15 @@ public partial class SettingsWindow : Window
             _ => 1
         };
         CustomTermsBox.Text = string.Join(Environment.NewLine, settings.CustomTerms);
+        CommandsInfoBadge.Visibility = ToneBox.SelectedIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
         RefreshMicrophoneStatus();
+    }
+
+    private void ToneBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        CommandsInfoBadge.Visibility = ToneBox.SelectedIndex == 4
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void CheckMicrophone_Click(object sender, RoutedEventArgs e)
@@ -95,6 +118,8 @@ public partial class SettingsWindow : Window
         if (sender is System.Windows.Controls.TextBox box)
         {
             box.SelectAll();
+            _captureModifiersPeak = ModifierKeys.None;
+            _captureHadNonModifier = false;
             HotkeyHelpText.Text = "Drücke jetzt die gewünschte Tastenkombination. Esc bricht ab, Backspace löscht das Feld.";
         }
     }
@@ -111,6 +136,8 @@ public partial class SettingsWindow : Window
 
         if (key == Key.Escape)
         {
+            _captureModifiersPeak = ModifierKeys.None;
+            _captureHadNonModifier = false;
             Keyboard.ClearFocus();
             HotkeyHelpText.Text = "Hotkey-Aufnahme abgebrochen.";
             return;
@@ -118,11 +145,24 @@ public partial class SettingsWindow : Window
 
         if (key == Key.Back)
         {
+            _captureModifiersPeak = ModifierKeys.None;
+            _captureHadNonModifier = false;
             box.Text = "";
             HotkeyHelpText.Text = "Hotkey gelöscht. Bitte vor dem Speichern eine neue Kombination wählen.";
             return;
         }
 
+        _captureModifiersPeak |= Keyboard.Modifiers;
+
+        if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin)
+        {
+            HotkeyHelpText.Text = CountModifiers(Keyboard.Modifiers) >= 2
+                ? "Lasse alle Tasten los, um diese Modifier-Kombination zu speichern, oder drücke noch eine weitere Taste."
+                : "Halte mindestens zwei Modifier-Tasten (Strg, Alt, Umschalt, Win) oder Modifier + weitere Taste.";
+            return;
+        }
+
+        _captureHadNonModifier = true;
         var hotkey = BuildHotkeyText(key);
         if (hotkey is null)
         {
@@ -132,6 +172,39 @@ public partial class SettingsWindow : Window
 
         box.Text = hotkey;
         HotkeyHelpText.Text = $"Hotkey gesetzt: {hotkey}";
+        _captureModifiersPeak = ModifierKeys.None;
+        Keyboard.ClearFocus();
+    }
+
+    private void HotkeyBox_PreviewKeyUp(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.TextBox box)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+
+        if (key is not (Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin))
+        {
+            return;
+        }
+
+        if (_captureHadNonModifier || Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
+        var hotkey = BuildModifierOnlyText(_captureModifiersPeak);
+        if (hotkey is null)
+        {
+            return;
+        }
+
+        box.Text = hotkey;
+        HotkeyHelpText.Text = $"Hotkey gesetzt: {hotkey}";
+        _captureModifiersPeak = ModifierKeys.None;
         Keyboard.ClearFocus();
     }
 
@@ -204,6 +277,15 @@ public partial class SettingsWindow : Window
                 : TranscriptionModelBox.Text.Trim();
             settings.HotkeyMode = HotkeyModeBox.SelectedIndex == 1 ? HotkeyMode.Hold : HotkeyMode.Toggle;
             settings.AutoPaste = AutoPasteBox.IsChecked == true;
+            settings.AutoPasteDelay = AutoPasteDelayBox.IsChecked == true;
+            settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
+            settings.DoubleTapModifier = DoubleTapModifierBox.SelectedIndex switch
+            {
+                1 => ModifierKey.Alt,
+                2 => ModifierKey.Shift,
+                _ => ModifierKey.Ctrl
+            };
+            settings.PreRollEnabled = PreRollEnabledBox.IsChecked == true;
             settings.AudioInputDeviceNumber = MicrophoneBox.SelectedValue is int selectedMicrophone
                 ? selectedMicrophone
                 : 0;
@@ -231,6 +313,8 @@ public partial class SettingsWindow : Window
             {
                 0 => TextTone.Formal,
                 2 => TextTone.Casual,
+                3 => TextTone.JornMinimal,
+                4 => TextTone.JornCommands,
                 _ => TextTone.Neutral
             };
             settings.TextImprovement.Context = ContextBox.Text.Trim();
@@ -248,6 +332,7 @@ public partial class SettingsWindow : Window
                 .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            settings.DebugMode = DebugModeBox.IsChecked == true;
 
             await settingsStore.SaveAsync(settings);
             SettingsSaved?.Invoke(this, EventArgs.Empty);
@@ -275,6 +360,22 @@ public partial class SettingsWindow : Window
 
         return duplicate is null ? null : $"Hotkey doppelt vergeben: {duplicate.Key}";
     }
+
+    private static string? BuildModifierOnlyText(ModifierKeys modifiers)
+    {
+        var parts = new List<string>();
+        if (modifiers.HasFlag(ModifierKeys.Control)) parts.Add("Ctrl");
+        if (modifiers.HasFlag(ModifierKeys.Alt)) parts.Add("Alt");
+        if (modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
+        if (modifiers.HasFlag(ModifierKeys.Windows)) parts.Add("Win");
+        return parts.Count >= 2 ? string.Join("+", parts) : null;
+    }
+
+    private static int CountModifiers(ModifierKeys modifiers) =>
+        (modifiers.HasFlag(ModifierKeys.Control) ? 1 : 0) +
+        (modifiers.HasFlag(ModifierKeys.Alt) ? 1 : 0) +
+        (modifiers.HasFlag(ModifierKeys.Shift) ? 1 : 0) +
+        (modifiers.HasFlag(ModifierKeys.Windows) ? 1 : 0);
 
     private static string? BuildHotkeyText(Key key)
     {

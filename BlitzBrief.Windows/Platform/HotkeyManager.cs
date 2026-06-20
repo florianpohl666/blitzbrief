@@ -1,5 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 using BlitzBrief.Core.Models;
+using BlitzBrief.Core.Settings;
 
 namespace BlitzBrief.Windows.Platform;
 
@@ -10,6 +11,7 @@ public sealed class HotkeyManager : IDisposable
     private const int WmKeyUp = 0x0101;
     private const int WmSysKeyDown = 0x0104;
     private const int WmSysKeyUp = 0x0105;
+    private const long DoubleTapWindowMs = 400;
 
     private readonly LowLevelKeyboardProc hookProc;
     private readonly Dictionary<WorkflowType, HotkeyRegistration> registrations = [];
@@ -17,8 +19,17 @@ public sealed class HotkeyManager : IDisposable
     private readonly HashSet<WorkflowType> activeCombos = [];
     private IntPtr hookHandle;
 
+    // Doppeltipp-Status.
+    private int[] doubleTapVks = [];
+    private WorkflowType doubleTapWorkflow;
+    private bool doubleTapEnabled;
+    private bool tapInProgress;
+    private bool tapPolluted;
+    private long lastTapTickMs;
+
     public event EventHandler<WorkflowType>? HotkeyPressed;
     public event EventHandler<WorkflowType>? HotkeyReleased;
+    public event EventHandler<WorkflowType>? DoubleTapDetected;
 
     public HotkeyManager()
     {
@@ -45,6 +56,23 @@ public sealed class HotkeyManager : IDisposable
         activeCombos.Clear();
     }
 
+    public void ConfigureDoubleTap(bool enabled, ModifierKey modifier, WorkflowType workflow)
+    {
+        doubleTapEnabled = enabled;
+        doubleTapWorkflow = workflow;
+        doubleTapVks = modifier switch
+        {
+            // Linke und rechte Variante des jeweiligen Modifiers.
+            ModifierKey.Ctrl => [0xA2, 0xA3],
+            ModifierKey.Alt => [0xA4, 0xA5],
+            ModifierKey.Shift => [0xA0, 0xA1],
+            _ => []
+        };
+        tapInProgress = false;
+        tapPolluted = false;
+        lastTapTickMs = 0;
+    }
+
     private IntPtr HookCallback(int code, IntPtr wParam, IntPtr lParam)
     {
         if (code >= 0)
@@ -53,17 +81,80 @@ public sealed class HotkeyManager : IDisposable
             var key = Marshal.ReadInt32(lParam);
             if (message is WmKeyDown or WmSysKeyDown)
             {
+                TrackDoubleTapDown(key);
                 pressedKeys.Add(key);
                 FirePressedCombos();
             }
             else if (message is WmKeyUp or WmSysKeyUp)
             {
                 pressedKeys.Remove(key);
+                TrackDoubleTapUp(key);
                 FireReleasedCombos();
             }
         }
 
         return CallNextHookEx(hookHandle, code, wParam, lParam);
+    }
+
+    private void TrackDoubleTapDown(int key)
+    {
+        if (!doubleTapEnabled)
+        {
+            return;
+        }
+
+        var isModifier = Array.IndexOf(doubleTapVks, key) >= 0;
+        if (isModifier)
+        {
+            if (pressedKeys.Contains(key))
+            {
+                return; // Auto-Repeat ignorieren.
+            }
+
+            if (pressedKeys.Count == 0)
+            {
+                tapInProgress = true;
+                tapPolluted = false;
+            }
+            else
+            {
+                tapPolluted = true;
+            }
+        }
+        else if (tapInProgress)
+        {
+            // Andere Taste während des Tipp-Kandidaten → kein sauberer Tipp.
+            tapPolluted = true;
+        }
+    }
+
+    private void TrackDoubleTapUp(int key)
+    {
+        if (!doubleTapEnabled || Array.IndexOf(doubleTapVks, key) < 0 || !tapInProgress)
+        {
+            return;
+        }
+
+        var clean = !tapPolluted && pressedKeys.Count == 0;
+        tapInProgress = false;
+        tapPolluted = false;
+
+        if (!clean)
+        {
+            lastTapTickMs = 0;
+            return;
+        }
+
+        var now = Environment.TickCount64;
+        if (lastTapTickMs != 0 && now - lastTapTickMs <= DoubleTapWindowMs)
+        {
+            lastTapTickMs = 0;
+            DoubleTapDetected?.Invoke(this, doubleTapWorkflow);
+        }
+        else
+        {
+            lastTapTickMs = now;
+        }
     }
 
     private void FirePressedCombos()
@@ -117,13 +208,22 @@ public sealed class HotkeyManager : IDisposable
 
 public sealed record HotkeyRegistration(bool Ctrl, bool Shift, bool Alt, bool Win, int Key)
 {
+    // VK codes of all modifier keys — used to detect "no non-modifier key pressed".
+    private static readonly HashSet<int> ModifierVks = [0x10, 0x11, 0x12, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C];
+
     public bool IsPressed(HashSet<int> pressedKeys)
     {
-        return pressedKeys.Contains(Key) &&
-               Ctrl == IsAnyPressed(pressedKeys, 0x11, 0xA2, 0xA3) &&
-               Shift == IsAnyPressed(pressedKeys, 0x10, 0xA0, 0xA1) &&
-               Alt == IsAnyPressed(pressedKeys, 0x12, 0xA4, 0xA5) &&
-               Win == IsAnyPressed(pressedKeys, 0x5B, 0x5C);
+        var modifiersMatch =
+            Ctrl == IsAnyPressed(pressedKeys, 0x11, 0xA2, 0xA3) &&
+            Shift == IsAnyPressed(pressedKeys, 0x10, 0xA0, 0xA1) &&
+            Alt == IsAnyPressed(pressedKeys, 0x12, 0xA4, 0xA5) &&
+            Win == IsAnyPressed(pressedKeys, 0x5B, 0x5C);
+
+        if (Key != 0)
+            return pressedKeys.Contains(Key) && modifiersMatch;
+
+        // Modifier-only combo: all required modifiers pressed, no other key held.
+        return modifiersMatch && !pressedKeys.Any(k => !ModifierVks.Contains(k));
     }
 
     private static bool IsAnyPressed(HashSet<int> pressedKeys, params int[] keys) => keys.Any(pressedKeys.Contains);
@@ -192,6 +292,7 @@ public static class HotkeyParser
         }
 
         registration = new HotkeyRegistration(ctrl, shift, alt, win, key);
-        return key != 0 && (ctrl || shift || alt || win);
+        var modifierCount = (ctrl ? 1 : 0) + (shift ? 1 : 0) + (alt ? 1 : 0) + (win ? 1 : 0);
+        return (ctrl || shift || alt || win) && (key != 0 || modifierCount >= 2);
     }
 }

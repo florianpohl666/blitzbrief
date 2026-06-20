@@ -43,6 +43,31 @@ public sealed class PromptBuilderTests
     }
 
     [Fact]
+    public void JornMinimalPrompt_DoesNotContainReformulierung()
+    {
+        var settings = new TextImprovementSettings { Tone = TextTone.JornMinimal };
+        var prompt = PromptBuilder.BuildTextImprovementPrompt(settings, []);
+
+        Assert.Contains("Füllwörter", prompt);
+        Assert.Contains("NICHT um", prompt);
+        Assert.DoesNotContain("Lektor", prompt);
+    }
+
+    [Fact]
+    public void JornCommandsPrompt_DelegatesCommandReplacementToCode()
+    {
+        // Kommando-Ersetzung passiert jetzt in TranscriptionQualityService.ReplaceCommands –
+        // der GPT-Prompt enthält keine Kommandoliste mehr, aber noch die Kern-Anweisungen.
+        var settings = new TextImprovementSettings { Tone = TextTone.JornCommands };
+        var prompt = PromptBuilder.BuildTextImprovementPrompt(settings, []);
+
+        Assert.Contains("Füllwörter", prompt);
+        Assert.Contains("NICHT um", prompt);
+        Assert.DoesNotContain("Satzende", prompt);
+        Assert.DoesNotContain("Doppelpunkt", prompt);
+    }
+
+    [Fact]
     public void EmojiPrompt_UsesDensity()
     {
         var prompt = PromptBuilder.BuildEmojiPrompt(EmojiDensity.Viel);
