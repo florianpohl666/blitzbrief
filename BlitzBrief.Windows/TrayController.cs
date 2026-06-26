@@ -261,7 +261,9 @@ public sealed class TrayController : IDisposable
 
             var result = await workflowRunner.ProcessAsync(type, audio, token);
             AppLog.Write($"StopAndProcess result chars={result.Text.Length} totalMs={totalStopwatch.ElapsedMilliseconds} realtime={(realtimeTranscript is not null)} preview={result.Text[..Math.Min(60, result.Text.Length)]}");
-            clipboardPasteService.CopyText(result.Text);
+            // Abschließendes Leerzeichen, damit das nächste Diktat nahtlos anschließt
+            // und der Nutzer es nicht jedes Mal von Hand setzen muss.
+            clipboardPasteService.CopyText(result.Text + " ");
             if (settings.AutoPaste)
             {
                 await clipboardPasteService.PasteAsync(token);
