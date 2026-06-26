@@ -134,4 +134,40 @@ public sealed class TranscriptionQualityServiceTests
         Assert.DoesNotContain("– (", result);    // keine Whisper-Striche um Klammern
         Assert.DoesNotContain(") –", result);
     }
+
+    [Theory]
+    [InlineData("Gemäß Paragraf 103 ist das geregelt.", "Gemäß § 103 ist das geregelt.")]
+    [InlineData("siehe Paragraph 5 Absatz 2", "siehe § 5 Absatz 2")]
+    [InlineData("des Paragraphen 90a", "des § 90a")]                 // Genitiv + Buchstabenzusatz
+    [InlineData("PARAGRAF 7", "§ 7")]                                 // Großschreibung
+    [InlineData("Paragraf   12", "§ 12")]                             // Mehrfach-Leerzeichen kollabiert
+    public void NormalizeSymbols_Paragraf_VorZiffer_WirdZeichen(string input, string expected)
+    {
+        Assert.Equal(expected, TranscriptionQualityService.NormalizeSymbols(input));
+    }
+
+    [Theory]
+    [InlineData("Der erste Absatz des Paragrafen regelt das.")]      // kein folgender Wert -> Fließtext
+    [InlineData("Er nannte den Paragraphen unklar.")]
+    public void NormalizeSymbols_ParagrafOhneZiffer_BleibtFliesstext(string input)
+    {
+        Assert.Equal(input, TranscriptionQualityService.NormalizeSymbols(input));
+    }
+
+    [Theory]
+    [InlineData("Das kostet 100 Euro.", "Das kostet 100 €.")]
+    [InlineData("Eine Forderung von 1.000,50 Euro.", "Eine Forderung von 1.000,50 €.")]
+    [InlineData("Streitwert 25 euro", "Streitwert 25 €")]            // klein geschrieben
+    public void NormalizeSymbols_BetragVorEuro_WirdZeichen(string input, string expected)
+    {
+        Assert.Equal(expected, TranscriptionQualityService.NormalizeSymbols(input));
+    }
+
+    [Theory]
+    [InlineData("Wir reisen nach Europa.")]                          // "Euro" als Wortteil
+    [InlineData("Er zahlte mehrere Euro in bar.")]                   // kein Betrag davor
+    public void NormalizeSymbols_EuroOhneBetrag_BleibtUnberuehrt(string input)
+    {
+        Assert.Equal(input, TranscriptionQualityService.NormalizeSymbols(input));
+    }
 }

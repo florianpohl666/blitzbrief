@@ -70,6 +70,11 @@ public sealed class WorkflowRunner(
             throw new EmptyRecordingException("Keine Aufnahme erkannt.");
         }
 
+        // §-/€-Zeichen deterministisch erzwingen, sobald eine Ziffer folgt – das
+        // Transkriptionsmodell schreibt sie sonst mal als Zeichen, mal als Wort aus.
+        // Gilt für alle Modi, daher vor der Transkriptions-Rückgabe und vor stage1.
+        cleaned = TranscriptionQualityService.NormalizeSymbols(cleaned);
+
         if (type == WorkflowType.Transcription)
         {
             return new WorkflowResult(cleaned);

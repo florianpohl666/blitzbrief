@@ -132,6 +132,28 @@ public static class TranscriptionQualityService
     public static string ProcessJornCommands(string text) =>
         ReplaceCommands(NormalizeCommands(text));
 
+    // "Paragraf"/"Paragraph" und "Euro" schreibt das Transkriptionsmodell mal als
+    // Zeichen (§, €), mal als Wort aus. Sobald eine Ziffer im Spiel ist, ist die
+    // Bedeutung eindeutig (Paragraphennummer bzw. Geldbetrag) – dann erzwingen wir
+    // deterministisch das Zeichen, unabhängig davon, wie der Prompt gewirkt hat.
+    // Ohne folgende Ziffer bleibt der Fließtext unangetastet ("der erste Absatz des
+    // Paragrafen regelt das"). Inflektion (-en/-s) wird mitgenommen, damit auch der
+    // häufige Genitiv "des Paragraphen 5" greift.
+    private static readonly Regex ParagraphSymbol =
+        new(@"\bParagra(?:f|ph)(?:en|s)?\s+(?=\d)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // Betrag (mit optionalen Tausender-/Dezimaltrennzeichen) direkt vor "Euro";
+    // das Zeichen steht nach deutscher Konvention hinter dem Betrag: "1.000,50 €".
+    private static readonly Regex EuroSymbol =
+        new(@"(\d(?:[.,]?\d)*)\s*Euro\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    public static string NormalizeSymbols(string text)
+    {
+        text = ParagraphSymbol.Replace(text, "§ ");
+        text = EuroSymbol.Replace(text, "$1 €");
+        return text;
+    }
+
     private static readonly string[] CommonArtifacts =
     [
         "Untertitel der Amara.org-Community",
