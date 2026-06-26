@@ -15,7 +15,13 @@ public sealed class AppSettings
     public string RewriteModel { get; set; } = "gpt-4o-mini";
     public int AudioInputDeviceNumber { get; set; } = 0;
     public bool AutoPaste { get; set; } = true;
-    public bool AutoPasteDelay { get; set; } = false;
+
+    /// <summary>
+    /// Streamt das Audio während des Sprechens an die OpenAI-Realtime-API (geringere Latenz),
+    /// statt erst nach dem Stopp die ganze Datei hochzuladen. Fällt bei Fehlern automatisch auf
+    /// den Batch-Upload zurück. Greift nur für Realtime-fähige Modelle (gpt-4o(-mini)-transcribe).
+    /// </summary>
+    public bool UseRealtimeTranscription { get; set; } = true;
 
     /// <summary>
     /// Hält das Mikrofon durchgehend in einem kurzen Ringpuffer aktiv, damit das Diktat
@@ -43,6 +49,7 @@ public sealed class TextImprovementSettings
     public string SystemPrompt { get; set; } = "";
     public string Context { get; set; } = "";
     public TextTone Tone { get; set; } = TextTone.Neutral;
+    public bool SkipRewrite { get; set; } = false;
 }
 
 public enum ModifierKey

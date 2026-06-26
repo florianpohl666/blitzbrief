@@ -1,7 +1,8 @@
-﻿using System.Drawing;
-using System.IO;
+using System.Diagnostics;
 using System.Windows;
+using BlitzBrief.Core;
 using BlitzBrief.Core.Models;
+using BlitzBrief.Core.OpenAI;
 using BlitzBrief.Core.Security;
 using BlitzBrief.Core.Settings;
 using BlitzBrief.Core.Workflow;
@@ -16,6 +17,7 @@ public sealed class TrayController : IDisposable
     private readonly SettingsStore settingsStore;
     private readonly ApiKeyStore apiKeyStore;
     private readonly WorkflowRunner workflowRunner;
+    private readonly IRealtimeTranscriber realtimeTranscriber;
     private readonly Forms.NotifyIcon notifyIcon;
     private readonly HotkeyManager hotkeyManager = new();
     private readonly AudioRecorder audioRecorder = new();
@@ -25,22 +27,26 @@ public sealed class TrayController : IDisposable
     private OverlayWindow? overlayWindow;
     private CancellationTokenSource? processingCts;
     private WorkflowType? activeWorkflow;
+    private IRealtimeTranscriptionSession? activeSession;
+    private string? activeSessionPrompt;
     private bool disposed;
 
     public TrayController(
         AppSettings settings,
         SettingsStore settingsStore,
         ApiKeyStore apiKeyStore,
-        WorkflowRunner workflowRunner)
+        WorkflowRunner workflowRunner,
+        IRealtimeTranscriber realtimeTranscriber)
     {
         this.settings = settings;
         this.settingsStore = settingsStore;
         this.apiKeyStore = apiKeyStore;
         this.workflowRunner = workflowRunner;
+        this.realtimeTranscriber = realtimeTranscriber;
 
         notifyIcon = new Forms.NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = AppIcon.ForTray(),
             Text = "BlitzBrief",
             Visible = false,
             ContextMenuStrip = BuildMenu()
@@ -54,6 +60,8 @@ public sealed class TrayController : IDisposable
             ToggleWorkflow(type);
         };
         audioRecorder.AudioLevelChanged += (_, level) => overlayWindow?.SetLevel(level);
+        // Live-PCM während der Aufnahme an die laufende Realtime-Session streamen.
+        audioRecorder.FrameAvailable += (_, pcm) => activeSession?.Append(pcm);
     }
 
     public void Start()
@@ -164,20 +172,62 @@ public sealed class TrayController : IDisposable
         {
             processingCts?.Cancel();
             processingCts = new CancellationTokenSource();
+
+            // Realtime-Session VOR dem Scharfschalten öffnen, damit der Pre-Roll-Block live mitgesendet wird.
+            StartRealtimeSession(type);
             audioRecorder.Arm();
+
             activeWorkflow = type;
             SetStatus($"{type.DisplayName()}: Aufnahme läuft");
             ShowOverlayListening(type.DisplayName());
-            AppLog.Write($"StartRecording succeeded type={type}");
+            AppLog.Write($"StartRecording succeeded type={type} realtime={(activeSession is not null)}");
         }
         catch (Exception ex)
         {
             AppLog.Write($"StartRecording failed: {ex}");
+            AbortRealtimeSession();
             activeWorkflow = null;
             SetStatus("Aufnahmefehler");
             notifyIcon.ShowBalloonTip(5000, "BlitzBrief", ex.Message, Forms.ToolTipIcon.Error);
         }
     }
+
+    private void StartRealtimeSession(WorkflowType type)
+    {
+        activeSession = null;
+        activeSessionPrompt = null;
+
+        if (!settings.UseRealtimeTranscription || !IsRealtimeModel(settings.TranscriptionModel))
+        {
+            return;
+        }
+
+        var apiKey = apiKeyStore.Load();
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            return;
+        }
+
+        try
+        {
+            // Dauer beim Start unbekannt -> hasEnoughAudio: true; das Echo bei sehr kurzem
+            // Audio fängt der Retry-Pfad im WorkflowRunner ab.
+            var prompt = PromptBuilder.BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio: true);
+            activeSession = realtimeTranscriber.CreateSession(
+                apiKey, settings.TranscriptionModel, settings.Language, prompt, AudioRecorder.SampleRate);
+            activeSessionPrompt = prompt;
+            AppLog.Write($"Realtime session created model={settings.TranscriptionModel}");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write($"Realtime session create failed, falling back to batch: {ex.Message}");
+            activeSession = null;
+            activeSessionPrompt = null;
+        }
+    }
+
+    private static bool IsRealtimeModel(string model) =>
+        model.Contains("transcribe", StringComparison.OrdinalIgnoreCase);
 
     private async Task StopAndProcessAsync(WorkflowType type)
     {
@@ -187,40 +237,58 @@ public sealed class TrayController : IDisposable
         }
 
         var token = processingCts?.Token ?? CancellationToken.None;
-        string? audioPath = null;
+        var session = activeSession;
+        var sessionPrompt = activeSessionPrompt;
+        activeSession = null;
+        activeSessionPrompt = null;
+
         try
         {
             AppLog.Write($"StopAndProcess start type={type}");
+            var totalStopwatch = Stopwatch.StartNew();
             var recording = audioRecorder.Stop();
-            audioPath = recording.Path;
             SetStatus($"{type.DisplayName()}: wird verarbeitet");
             ShowOverlayProcessing();
-            var result = await workflowRunner.ProcessAsync(type, recording.Path, recording.Duration, token);
-            AppLog.Write($"StopAndProcess result chars={result.Text.Length} preview={result.Text[..Math.Min(60, result.Text.Length)]}");
+
+            string? realtimeTranscript = await FinishRealtimeAsync(session, recording.Duration, token);
+
+            var audio = new RecordedAudio(
+                recording.Pcm,
+                AudioRecorder.SampleRate,
+                recording.Duration,
+                realtimeTranscript,
+                sessionPrompt);
+
+            var result = await workflowRunner.ProcessAsync(type, audio, token);
+            AppLog.Write($"StopAndProcess result chars={result.Text.Length} totalMs={totalStopwatch.ElapsedMilliseconds} realtime={(realtimeTranscript is not null)} preview={result.Text[..Math.Min(60, result.Text.Length)]}");
             clipboardPasteService.CopyText(result.Text);
             if (settings.AutoPaste)
             {
-                if (settings.AutoPasteDelay)
-                {
-                    await Task.Delay(300, token);
-                }
                 await clipboardPasteService.PasteAsync(token);
             }
 
             HideOverlay();
-            SetStatus($"{type.DisplayName()}: fertig");
+            SetStatus($"{type.DisplayName()}: fertig ({totalStopwatch.ElapsedMilliseconds} ms)");
 
             if (settings.DebugMode && result.Stage1Transcript is not null)
             {
+                var raw = result.RawTranscript ?? result.Stage1Transcript;
                 var s1 = result.Stage1Transcript;
                 var s2 = result.Text;
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                    new DebugOutputWindow(s1, s2).Show());
+                    new DebugOutputWindow(raw, s1, s2).Show());
             }
         }
         catch (OperationCanceledException)
         {
             AppLog.Write($"StopAndProcess cancelled type={type}");
+            HideOverlay();
+            SetStatus("BlitzBrief bereit");
+        }
+        catch (EmptyRecordingException)
+        {
+            // Leere/zu kurze Aufnahme ist kein Fehler – still ignorieren, kein Popup.
+            AppLog.Write($"StopAndProcess empty recording type={type}");
             HideOverlay();
             SetStatus("BlitzBrief bereit");
         }
@@ -230,20 +298,68 @@ public sealed class TrayController : IDisposable
             HideOverlay();
             SetStatus("Fehler");
             notifyIcon.ShowBalloonTip(6000, "BlitzBrief", ex.Message, Forms.ToolTipIcon.Error);
-            if (audioPath is not null && File.Exists(audioPath))
-            {
-                TryDelete(audioPath);
-            }
         }
         finally
         {
+            if (session is not null)
+            {
+                await session.DisposeAsync();
+            }
+
             activeWorkflow = null;
+        }
+    }
+
+    // Committet die Realtime-Session und liefert das finale Transkript; bei Fehlern null
+    // (-> WorkflowRunner transkribiert per Batch nach). Zu kurze Aufnahmen erst gar nicht senden.
+    private static async Task<string?> FinishRealtimeAsync(
+        IRealtimeTranscriptionSession? session, TimeSpan duration, CancellationToken token)
+    {
+        if (session is null)
+        {
+            return null;
+        }
+
+        if (TranscriptionQualityService.ShouldRejectRecording(duration))
+        {
+            session.Abort();
+            return null;
+        }
+
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            var transcript = await session.CompleteAsync(token);
+            AppLog.Write($"Realtime transcript in {sw.ElapsedMilliseconds}ms chars={transcript.Length}");
+            return transcript;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write($"Realtime failed, fallback to batch: {ex.Message}");
+            return null;
+        }
+    }
+
+    private void AbortRealtimeSession()
+    {
+        var session = activeSession;
+        activeSession = null;
+        activeSessionPrompt = null;
+        if (session is not null)
+        {
+            session.Abort();
+            _ = session.DisposeAsync();
         }
     }
 
     private void CancelActiveWorkflow()
     {
         processingCts?.Cancel();
+        AbortRealtimeSession();
         audioRecorder.Cancel();
         activeWorkflow = null;
         HideOverlay();
@@ -259,7 +375,10 @@ public sealed class TrayController : IDisposable
             if (settingsWindow is null)
             {
                 AppLog.Write("Creating SettingsWindow.");
-                settingsWindow = new SettingsWindow(settings, settingsStore, apiKeyStore);
+                settingsWindow = new SettingsWindow(settings, settingsStore, apiKeyStore)
+                {
+                    Icon = AppIcon.ForWpf()
+                };
                 settingsWindow.SettingsSaved += (_, _) =>
                 {
                     RegisterHotkeys();
@@ -337,11 +456,6 @@ public sealed class TrayController : IDisposable
         notifyIcon.Text = text.Length > 63 ? text[..63] : text;
     }
 
-    private static void TryDelete(string path)
-    {
-        try { File.Delete(path); } catch { }
-    }
-
     public void Dispose()
     {
         if (disposed)
@@ -351,6 +465,7 @@ public sealed class TrayController : IDisposable
 
         disposed = true;
         processingCts?.Cancel();
+        AbortRealtimeSession();
         audioRecorder.Dispose();
         hotkeyManager.Dispose();
         overlayWindow?.Close();

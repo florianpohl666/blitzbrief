@@ -10,7 +10,7 @@ public sealed class OpenAIClient(HttpClient? httpClient = null) : IOpenAIClient
     private readonly HttpClient http = httpClient ?? new HttpClient();
 
     public async Task<string> TranscribeAsync(
-        string audioPath,
+        Stream audioWav,
         string apiKey,
         string language,
         string? whisperPrompt,
@@ -20,11 +20,10 @@ public sealed class OpenAIClient(HttpClient? httpClient = null) : IOpenAIClient
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/audio/transcriptions");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-        await using var audioStream = File.OpenRead(audioPath);
         using var form = new MultipartFormDataContent();
-        using var fileContent = new StreamContent(audioStream);
+        using var fileContent = new StreamContent(audioWav);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
-        form.Add(fileContent, "file", Path.GetFileName(audioPath));
+        form.Add(fileContent, "file", "audio.wav");
         form.Add(new StringContent(model), "model");
         form.Add(new StringContent("text"), "response_format");
 
@@ -46,13 +45,10 @@ public sealed class OpenAIClient(HttpClient? httpClient = null) : IOpenAIClient
             throw new OpenAIException(ParseError(body) ?? $"OpenAI transcription failed: {(int)response.StatusCode}");
         }
 
-        var text = body.Trim();
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            throw new OpenAIException("OpenAI returned an empty transcription.");
-        }
-
-        return text;
+        // Leeres Ergebnis ist kein Fehler (Stille / zu kurz / Modell findet keine
+        // Sprache) – als "" zurückgeben, damit der Aufrufer es still als "keine
+        // Aufnahme" behandeln und ggf. ohne Prompt erneut versuchen kann.
+        return body.Trim();
     }
 
     public async Task<string> RewriteAsync(

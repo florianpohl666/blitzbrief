@@ -1,3 +1,4 @@
+using BlitzBrief.Core.Models;
 using BlitzBrief.Core.Settings;
 
 namespace BlitzBrief.Core;
@@ -35,26 +36,40 @@ public static class PromptBuilder
                normalized.Contains("Gib NUR die fertige Nachricht zurueck", StringComparison.Ordinal);
     }
 
-    public static string? BuildWhisperPrompt(IReadOnlyList<string> customTerms, bool includeCommandHints)
+    public static string? BuildWhisperPrompt(IReadOnlyList<string> customTerms, bool includeCommandHints, string language = "")
     {
         var parts = new List<string>();
 
+        // Sprachvorgabe verstärkt den language-Parameter. gpt-4o-(mini-)transcribe
+        // folgt Anweisungen, das stabilisiert vor allem kurze Wörter gegen das
+        // Abdriften in fremde Sprachen. Bei "automatisch" ("") keine Vorgabe.
+        var languageName = LanguageDirectiveName(language);
+        if (languageName is not null)
+        {
+            parts.Add($"Transkribiere ausschließlich auf {languageName}.");
+        }
+
         if (customTerms.Count > 0)
         {
-            // Begriffe als Fließtext-Beispiel – Whisper orientiert sich am Schreibstil,
-            // keine kommagetrennte Liste die als Kontext ungeeignet ist.
-            var termSentences = string.Join(" Satzende ", customTerms);
-            parts.Add(termSentences + " Satzende");
+            // Explizite Schreibanweisung biast nachweislich stärker als das frühere
+            // "Begriff Satzende"-Fließtextformat (per A/B-Spike gegen Realtime+Batch bestätigt).
+            parts.Add("Verwende für folgende Eigennamen und Fachbegriffe exakt diese Schreibweise: " +
+                      string.Join(", ", customTerms) + ".");
         }
 
         if (includeCommandHints)
         {
-            // Mustertext zeigt Kommandowörter als normale Wörter im Fließtext,
-            // damit Whisper sie nicht eigenständig in Satzzeichen umwandelt.
+            // Kurze Anweisung statt langer Beispielsätze: gpt-4o-mini-transcribe folgt
+            // Anweisungen, und ein kurzer Prompt verbiegt kurze Diktate kaum noch.
+            // (Die früheren langen Beispielsätze wurden bei Einzelwörtern als
+            // Prompt-Echo zurückgespiegelt – siehe Retry-Schutz im WorkflowRunner.)
+            // Der juristische Kontext primt die Schreibweise von Zeichen wie § und €,
+            // die ohne Stilkontext sonst als "Paragraf"/"Euro" transkribiert werden.
             parts.Add(
-                "Der Auskunftsanspruch ist begründet Komma da die Voraussetzungen vorliegen Satzende " +
-                "Die Eigentumsvormerkung wurde eingetragen Satzende Absatz " +
-                "Der Kaufpreisanspruch ist fällig Komma sobald die Übergabe erfolgt Satzende");
+                "Es handelt sich um formelle juristische Texte in deutscher Sprache; " +
+                "verwende juristische Schreibweise und Zeichen (z. B. § statt Paragraf, € statt Euro). " +
+                "Diktierbefehle wörtlich als Wörter transkribieren, nicht in Satzzeichen umwandeln: " +
+                "Komma, Satzende, Doppelpunkt, Semikolon, Gedankenstrich, Klammer auf, Klammer zu, neue Zeile, neuer Absatz, Leerzeile.");
         }
 
         if (parts.Count == 0)
@@ -64,6 +79,27 @@ public static class PromptBuilder
 
         return string.Join(" ", parts);
     }
+
+    /// <summary>
+    /// Baut den Transkriptions-Prompt für einen Workflow. Wird sowohl beim Realtime-Start
+    /// (Dauer noch unbekannt -> hasEnoughAudio: true) als auch im Batch-Fallback (Dauer bekannt)
+    /// genutzt, damit beide Pfade identisch primen.
+    /// </summary>
+    public static string? BuildWorkflowWhisperPrompt(WorkflowType type, AppSettings settings, bool hasEnoughAudio)
+    {
+        var useCommandHints = type == WorkflowType.TextImprover &&
+                              settings.TextImprovement.Tone == TextTone.JornCommands &&
+                              hasEnoughAudio;
+        var customTerms = hasEnoughAudio ? settings.CustomTerms : (IReadOnlyList<string>)[];
+        return BuildWhisperPrompt(customTerms, useCommandHints, settings.Language);
+    }
+
+    private static string? LanguageDirectiveName(string language) => language.Trim().ToLowerInvariant() switch
+    {
+        "de" => "Deutsch",
+        "en" => "Englisch",
+        _ => null
+    };
 
     public static string BuildTextImprovementPrompt(TextImprovementSettings settings, IReadOnlyList<string> customTerms)
     {
@@ -129,12 +165,13 @@ public static class PromptBuilder
         "- Gib NUR den bereinigten Text zurück, keine Erklärungen";
 
     private static string BuildJornCommandsPrompt() =>
-        "Du erhältst ein gesprochenes Transkript. Satzzeichen wurden bereits durch Code ersetzt. Deine Aufgabe:\n" +
+        "Du erhältst einen juristischen Text. Formatierungen und Satzzeichen bitte beibehalten. Deine Aufgabe:\n" +
         "- Entferne Füllwörter (äh, ähm, halt, irgendwie, eigentlich, sozusagen, quasi, also, ne, oder so)\n" +
         "- Korrigiere offensichtliche Grammatik- und Rechtschreibfehler\n" +
         "- Formuliere NICHT um – behalte Wortwahl und Satzstruktur des Sprechers exakt bei\n" +
         "- Der Text kann ein vollständiger Satz, ein Halbsatz oder nur einzelne Wörter sein – ergänze NICHTS, vervollständige NICHTS\n" +
-        "- Behalte Groß-/Kleinschreibung am Anfang des Textes exakt wie im Transkript\n" +
+        "- Schreibe das erste Wort klein, wenn es kein vollständiger Satz ist und es kein Substantiv ist.\n" +
         "- Entferne KEINE vorhandenen Satzzeichen\n" +
+        "- Entferne KEINE vorhandenen Zeilenumbrüche\n" +
         "- Gib NUR den bereinigten Text zurück, keine Erklärungen";
 }

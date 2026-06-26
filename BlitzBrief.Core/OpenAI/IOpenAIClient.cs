@@ -1,11 +1,10 @@
-﻿using BlitzBrief.Core.Settings;
-
 namespace BlitzBrief.Core.OpenAI;
 
 public interface IOpenAIClient
 {
+    /// <summary>Batch-Transkription eines fertigen WAV-Streams (Fallback, wenn Realtime nicht greift).</summary>
     Task<string> TranscribeAsync(
-        string audioPath,
+        Stream audioWav,
         string apiKey,
         string language,
         string? whisperPrompt,

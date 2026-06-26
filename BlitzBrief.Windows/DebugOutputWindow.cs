@@ -6,13 +6,13 @@ namespace BlitzBrief.Windows;
 
 public sealed class DebugOutputWindow : Window
 {
-    public DebugOutputWindow(string stage1, string stage2)
+    public DebugOutputWindow(string rawTranscript, string stage1, string stage2)
     {
         Title = "BlitzBrief – Debug";
         Width = 720;
-        Height = 540;
+        Height = 720;
         MinWidth = 500;
-        MinHeight = 400;
+        MinHeight = 500;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ShowInTaskbar = true;
         FontFamily = new SWM.FontFamily("Segoe UI");
@@ -25,21 +25,31 @@ public sealed class DebugOutputWindow : Window
         outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         outer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        outer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var label1 = MakeLabel("Stufe 1 – Transkription (roh)", topMargin: 0);
-        Grid.SetRow(label1, 0);
+        var labelRaw = MakeLabel("Whisper roh (vor Kommandoersetzung)", topMargin: 0);
+        Grid.SetRow(labelRaw, 0);
+        outer.Children.Add(labelRaw);
+
+        var boxRaw = MakeTextBox(rawTranscript);
+        Grid.SetRow(boxRaw, 1);
+        outer.Children.Add(boxRaw);
+
+        var label1 = MakeLabel("Stufe 1 – nach Kommandoersetzung", topMargin: 12);
+        Grid.SetRow(label1, 2);
         outer.Children.Add(label1);
 
         var box1 = MakeTextBox(stage1);
-        Grid.SetRow(box1, 1);
+        Grid.SetRow(box1, 3);
         outer.Children.Add(box1);
 
         var label2 = MakeLabel("Stufe 2 – Ergebnis nach Rewrite", topMargin: 12);
-        Grid.SetRow(label2, 2);
+        Grid.SetRow(label2, 4);
         outer.Children.Add(label2);
 
         var box2 = MakeTextBox(stage2);
-        Grid.SetRow(box2, 3);
+        Grid.SetRow(box2, 5);
         outer.Children.Add(box2);
 
         var closeBtn = new System.Windows.Controls.Button
@@ -53,7 +63,7 @@ public sealed class DebugOutputWindow : Window
             Cursor = System.Windows.Input.Cursors.Hand
         };
         closeBtn.Click += (_, _) => Close();
-        Grid.SetRow(closeBtn, 4);
+        Grid.SetRow(closeBtn, 6);
         outer.Children.Add(closeBtn);
 
         Content = outer;

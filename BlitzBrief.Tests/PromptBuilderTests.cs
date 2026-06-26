@@ -3,6 +3,7 @@ using BlitzBrief.Core.Settings;
 
 namespace BlitzBrief.Tests;
 
+
 public sealed class PromptBuilderTests
 {
     [Fact]
@@ -65,6 +66,23 @@ public sealed class PromptBuilderTests
         Assert.Contains("NICHT um", prompt);
         Assert.DoesNotContain("Satzende", prompt);
         Assert.DoesNotContain("Doppelpunkt", prompt);
+    }
+
+    [Fact]
+    public void WhisperPrompt_AddsLanguageDirective_AndShortCommandHint()
+    {
+        var de = PromptBuilder.BuildWhisperPrompt([], includeCommandHints: true, "de");
+        Assert.Contains("auf Deutsch", de);
+        Assert.Contains("Diktierbefehle", de);
+        Assert.Contains("§", de);          // juristische Zeichen-Vorgabe
+        Assert.Contains("juristische", de);
+        Assert.DoesNotContain("Auskunftsanspruch", de); // alte lange Beispielsätze sind weg
+
+        var en = PromptBuilder.BuildWhisperPrompt([], includeCommandHints: false, "en");
+        Assert.Contains("auf Englisch", en);
+
+        // Automatik ("") ohne Hints und ohne Begriffe -> gar kein Prompt
+        Assert.Null(PromptBuilder.BuildWhisperPrompt([], includeCommandHints: false, ""));
     }
 
     [Fact]

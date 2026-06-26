@@ -3,25 +3,29 @@ using NAudio.Wave;
 
 namespace BlitzBrief.Windows.Platform;
 
-public sealed record RecordingResult(string Path, TimeSpan Duration);
+public sealed record RecordingResult(byte[] Pcm, TimeSpan Duration);
 public sealed record AudioInputDeviceInfo(int Index, string Name, int Channels);
 
 /// <summary>
 /// Nimmt das Mikrofon durchgehend in einen Ringpuffer auf (Pre-Roll), damit das
 /// Scharfschalten beim Hotkey verzögerungsfrei ist und die ~300 ms vor dem
-/// Tastendruck nicht verloren gehen. Ohne Pre-Roll wird das Gerät erst beim
-/// Scharfschalten geöffnet (altes Verhalten).
+/// Tastendruck nicht verloren gehen. Während der Aufnahme wird das PCM sowohl in
+/// einen Speicherpuffer geschrieben (für den Batch-Fallback) als auch über
+/// <see cref="FrameAvailable"/> live weitergereicht (für die Realtime-Transkription).
 /// </summary>
 public sealed class AudioRecorder : IDisposable
 {
-    private static readonly WaveFormat Format = new(16000, 16, 1);
+    // 24 kHz mono PCM16 = Eingabeformat der OpenAI-Realtime-API; für den Batch-Upload ebenso gültig.
+    private static readonly WaveFormat Format = new(24000, 16, 1);
     private static int ByteRate => Format.AverageBytesPerSecond;
+
+    /// <summary>Abtastrate der Aufnahme (Hz) – wird für Realtime-Session und WAV-Fallback gebraucht.</summary>
+    public static int SampleRate => Format.SampleRate;
 
     private readonly object sync = new();
 
     private WaveInEvent? capture;
-    private WaveFileWriter? writer;
-    private string? currentPath;
+    private MemoryStream? armedBuffer;
     private long bytesWritten;
     private bool armed;
     private bool disposed;
@@ -37,6 +41,9 @@ public sealed class AudioRecorder : IDisposable
 
     /// <summary>Normalisierter Pegel (0..1) pro eingehendem Audio-Block, für die Overlay-Anzeige.</summary>
     public event EventHandler<float>? AudioLevelChanged;
+
+    /// <summary>Live-PCM-Block (16-bit mono, <see cref="SampleRate"/>) während scharfgeschalteter Aufnahme. Jeweils eine eigene Kopie.</summary>
+    public event EventHandler<byte[]>? FrameAvailable;
 
     public static IReadOnlyList<AudioInputDeviceInfo> AvailableDevices()
     {
@@ -80,6 +87,7 @@ public sealed class AudioRecorder : IDisposable
     /// <summary>Schaltet scharf: schreibt den Pre-Roll-Puffer und nimmt live weiter auf. Verzögerungsfrei.</summary>
     public void Arm()
     {
+        byte[]? preRoll = null;
         lock (sync)
         {
             if (disposed)
@@ -97,8 +105,7 @@ public sealed class AudioRecorder : IDisposable
                 throw new InvalidOperationException($"Das ausgewählte Mikrofon ist nicht verfügbar: {deviceNumber}. Bitte in den Einstellungen ein anderes Mikrofon wählen.");
             }
 
-            currentPath = Path.Combine(Path.GetTempPath(), $"BlitzBrief-{Guid.NewGuid():N}.wav");
-            writer = new WaveFileWriter(currentPath, Format);
+            armedBuffer = new MemoryStream();
             bytesWritten = 0;
 
             if (!capturing)
@@ -108,11 +115,17 @@ public sealed class AudioRecorder : IDisposable
             }
             else if (preRollEnabled)
             {
-                WritePreRoll();
+                preRoll = CollectPreRoll();
             }
 
             armed = true;
-            AppLog.Write($"AudioRecorder.Arm device={deviceNumber} preRoll={preRollEnabled} path={currentPath}");
+            AppLog.Write($"AudioRecorder.Arm device={deviceNumber} preRoll={preRollEnabled} preRollBytes={preRoll?.Length ?? 0}");
+        }
+
+        // Außerhalb des Locks, damit der Consumer (Realtime-Session) nicht unter der Sperre arbeitet.
+        if (preRoll is not null)
+        {
+            FrameAvailable?.Invoke(this, preRoll);
         }
     }
 
@@ -120,17 +133,15 @@ public sealed class AudioRecorder : IDisposable
     {
         lock (sync)
         {
-            if (!armed || currentPath is null)
+            if (!armed || armedBuffer is null)
             {
                 throw new InvalidOperationException("Es läuft keine Aufnahme.");
             }
 
-            var path = currentPath;
             armed = false;
-            var bytes = bytesWritten;
-
-            FinishWriter();
-            currentPath = null;
+            var pcm = armedBuffer.ToArray();
+            armedBuffer.Dispose();
+            armedBuffer = null;
 
             // Ohne Pre-Roll wird das Gerät nur während der Aufnahme offen gehalten.
             if (!preRollEnabled)
@@ -138,33 +149,25 @@ public sealed class AudioRecorder : IDisposable
                 StopCaptureCore();
             }
 
-            var duration = TimeSpan.FromSeconds((double)bytes / ByteRate);
-            var length = File.Exists(path) ? new FileInfo(path).Length : 0;
-            AppLog.Write($"AudioRecorder.Stop path={path} durationMs={duration.TotalMilliseconds:N0} bytes={length}");
-            return new RecordingResult(path, duration);
+            var duration = TimeSpan.FromSeconds((double)bytesWritten / ByteRate);
+            AppLog.Write($"AudioRecorder.Stop durationMs={duration.TotalMilliseconds:N0} bytes={pcm.Length}");
+            return new RecordingResult(pcm, duration);
         }
     }
 
-    /// <summary>Bricht eine scharfgeschaltete Aufnahme ab und verwirft die Datei. Pre-Roll läuft weiter.</summary>
+    /// <summary>Bricht eine scharfgeschaltete Aufnahme ab und verwirft den Puffer. Pre-Roll läuft weiter.</summary>
     public void Cancel()
     {
-        string? path;
         lock (sync)
         {
-            path = currentPath;
-            currentPath = null;
             armed = false;
-            FinishWriter();
+            armedBuffer?.Dispose();
+            armedBuffer = null;
 
             if (!preRollEnabled)
             {
                 StopCaptureCore();
             }
-        }
-
-        if (path is not null && File.Exists(path))
-        {
-            try { File.Delete(path); } catch { }
         }
     }
 
@@ -179,19 +182,13 @@ public sealed class AudioRecorder : IDisposable
 
             disposed = true;
             armed = false;
-            FinishWriter();
+            armedBuffer?.Dispose();
+            armedBuffer = null;
             StopCaptureCore();
-
-            if (currentPath is not null && File.Exists(currentPath))
-            {
-                try { File.Delete(currentPath); } catch { }
-            }
-
-            currentPath = null;
         }
     }
 
-    // --- intern (immer unter sync aufgerufen, außer im DataAvailable-Callback) ---
+    // --- intern (immer unter sync aufgerufen, außer in den FrameAvailable/Level-Callbacks) ---
 
     private void StartCaptureCore()
     {
@@ -232,6 +229,7 @@ public sealed class AudioRecorder : IDisposable
 
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
+        byte[]? frame = null;
         lock (sync)
         {
             if (disposed)
@@ -241,13 +239,20 @@ public sealed class AudioRecorder : IDisposable
 
             if (armed)
             {
-                writer?.Write(e.Buffer, 0, e.BytesRecorded);
+                armedBuffer?.Write(e.Buffer, 0, e.BytesRecorded);
                 bytesWritten += e.BytesRecorded;
+                frame = new byte[e.BytesRecorded];
+                Array.Copy(e.Buffer, frame, e.BytesRecorded);
             }
             else if (preRollEnabled && ringBuffer.Length > 0)
             {
                 PushToRing(e.Buffer, e.BytesRecorded);
             }
+        }
+
+        if (frame is not null)
+        {
+            FrameAvailable?.Invoke(this, frame);
         }
 
         RaiseLevel(e.Buffer, e.BytesRecorded);
@@ -284,45 +289,37 @@ public sealed class AudioRecorder : IDisposable
         }
     }
 
-    private void WritePreRoll()
+    /// <summary>Liefert den Pre-Roll-Inhalt in chronologischer Reihenfolge und schreibt ihn in den Aufnahmepuffer.</summary>
+    private byte[] CollectPreRoll()
     {
-        if (writer is null || ringBuffer.Length == 0)
+        if (armedBuffer is null || ringBuffer.Length == 0)
         {
-            return;
+            return [];
         }
 
+        byte[] preRoll;
         if (ringFilled)
         {
+            preRoll = new byte[ringBuffer.Length];
             var tail = ringBuffer.Length - ringWritePos;
-            writer.Write(ringBuffer, ringWritePos, tail);
-            writer.Write(ringBuffer, 0, ringWritePos);
-            bytesWritten += ringBuffer.Length;
+            Array.Copy(ringBuffer, ringWritePos, preRoll, 0, tail);
+            Array.Copy(ringBuffer, 0, preRoll, tail, ringWritePos);
         }
         else
         {
-            writer.Write(ringBuffer, 0, ringWritePos);
-            bytesWritten += ringWritePos;
+            preRoll = new byte[ringWritePos];
+            Array.Copy(ringBuffer, 0, preRoll, 0, ringWritePos);
         }
+
+        armedBuffer.Write(preRoll, 0, preRoll.Length);
+        bytesWritten += preRoll.Length;
+        return preRoll;
     }
 
     private void ResetRing()
     {
         ringWritePos = 0;
         ringFilled = false;
-    }
-
-    private void FinishWriter()
-    {
-        if (writer is not null)
-        {
-            try
-            {
-                writer.Flush();
-                writer.Dispose();
-            }
-            catch { }
-            writer = null;
-        }
     }
 
     private void RaiseLevel(byte[] buffer, int count)

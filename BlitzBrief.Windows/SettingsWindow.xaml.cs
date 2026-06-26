@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Input;
 using BlitzBrief.Core;
 using BlitzBrief.Core.Models;
@@ -18,6 +18,7 @@ public partial class SettingsWindow : Window
 
     private ModifierKeys _captureModifiersPeak;
     private bool _captureHadNonModifier;
+    private bool _loading;
 
     public SettingsWindow(AppSettings settings, SettingsStore settingsStore, ApiKeyStore apiKeyStore)
     {
@@ -30,64 +31,167 @@ public partial class SettingsWindow : Window
 
     private void LoadValues()
     {
-        ApiKeyStatusText.Text = apiKeyStore.IsConfigured
-            ? $"OpenAI API Key gespeichert: {apiKeyStore.DisplayValue}"
-            : "Noch kein OpenAI API Key gespeichert.";
+        _loading = true;
+        try
+        {
+            ApiKeyStatusText.Text = apiKeyStore.IsConfigured
+                ? $"OpenAI API Key gespeichert: {apiKeyStore.DisplayValue}"
+                : "Noch kein OpenAI API Key gespeichert.";
 
-        LanguageBox.Text = settings.Language;
-        TranscriptionModelBox.Text = settings.TranscriptionModel;
-        HotkeyModeBox.SelectedIndex = settings.HotkeyMode == HotkeyMode.Hold ? 1 : 0;
-        AutoPasteBox.IsChecked = settings.AutoPaste;
-        AutoPasteDelayBox.IsChecked = settings.AutoPasteDelay;
-        DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
-        DoubleTapModifierBox.SelectedIndex = settings.DoubleTapModifier switch
+            LanguageBox.SelectedIndex = settings.Language switch
+            {
+                "en" => 1,
+                "" => 2,
+                _ => 0
+            };
+            TranscriptionModelBox.Text = settings.TranscriptionModel;
+            HotkeyModeBox.SelectedIndex = settings.HotkeyMode == HotkeyMode.Hold ? 1 : 0;
+            AutoPasteBox.IsChecked = settings.AutoPaste;
+DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
+            DoubleTapModifierBox.SelectedIndex = settings.DoubleTapModifier switch
+            {
+                ModifierKey.Alt => 1,
+                ModifierKey.Shift => 2,
+                _ => 0
+            };
+            PreRollEnabledBox.IsChecked = settings.PreRollEnabled;
+            RealtimeBox.IsChecked = settings.UseRealtimeTranscription;
+            DebugModeBox.IsChecked = settings.DebugMode;
+            TranscriptionHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.Transcription];
+            TextImproverHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.TextImprover];
+            DampfHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.DampfAblassen];
+            EmojiHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.EmojiText];
+            ToneBox.SelectedIndex = settings.TextImprovement.Tone switch
+            {
+                TextTone.Formal => 0,
+                TextTone.Casual => 2,
+                TextTone.JornMinimal => 3,
+                TextTone.JornCommands => 4,
+                _ => 1
+            };
+            SkipRewriteBox.IsChecked = settings.TextImprovement.SkipRewrite;
+            ContextBox.Text = settings.TextImprovement.Context;
+            TextPromptBox.Text = settings.TextImprovement.SystemPrompt;
+            DampfPromptBox.Text = PromptBuilder.ShouldReplaceLegacyDampfPrompt(settings.DampfAblassen.SystemPrompt)
+                ? PromptBuilder.DefaultDampfAblassenPrompt
+                : settings.DampfAblassen.SystemPrompt;
+            EmojiDensityBox.SelectedIndex = settings.EmojiText.EmojiDensity switch
+            {
+                EmojiDensity.Wenig => 0,
+                EmojiDensity.Viel => 2,
+                _ => 1
+            };
+            CustomTermsBox.Text = string.Join(Environment.NewLine, settings.CustomTerms);
+            CommandsInfoBadge.Visibility = ToneBox.SelectedIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
+            RefreshMicrophoneStatus();
+        }
+        finally
         {
-            ModifierKey.Alt => 1,
-            ModifierKey.Shift => 2,
-            _ => 0
-        };
-        PreRollEnabledBox.IsChecked = settings.PreRollEnabled;
-        DebugModeBox.IsChecked = settings.DebugMode;
-        TranscriptionHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.Transcription];
-        TextImproverHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.TextImprover];
-        DampfHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.DampfAblassen];
-        EmojiHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.EmojiText];
-        ToneBox.SelectedIndex = settings.TextImprovement.Tone switch
-        {
-            TextTone.Formal => 0,
-            TextTone.Casual => 2,
-            TextTone.JornMinimal => 3,
-            TextTone.JornCommands => 4,
-            _ => 1
-        };
-        ContextBox.Text = settings.TextImprovement.Context;
-        TextPromptBox.Text = settings.TextImprovement.SystemPrompt;
-        DampfPromptBox.Text = PromptBuilder.ShouldReplaceLegacyDampfPrompt(settings.DampfAblassen.SystemPrompt)
-            ? PromptBuilder.DefaultDampfAblassenPrompt
-            : settings.DampfAblassen.SystemPrompt;
-        EmojiDensityBox.SelectedIndex = settings.EmojiText.EmojiDensity switch
-        {
-            EmojiDensity.Wenig => 0,
-            EmojiDensity.Viel => 2,
-            _ => 1
-        };
-        CustomTermsBox.Text = string.Join(Environment.NewLine, settings.CustomTerms);
-        CommandsInfoBadge.Visibility = ToneBox.SelectedIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
-        RefreshMicrophoneStatus();
+            _loading = false;
+        }
     }
 
     private void ToneBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
-        CommandsInfoBadge.Visibility = ToneBox.SelectedIndex == 4
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        CommandsInfoBadge.Visibility = ToneBox.SelectedIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
+        _ = AutoSave();
+    }
+
+    private void Setting_Changed(object sender, RoutedEventArgs e) => _ = AutoSave();
+
+    private void ComboBox_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e) => _ = AutoSave();
+
+    private async Task AutoSave()
+    {
+        if (_loading) return;
+        try
+        {
+            CollectSettingsFromUI();
+
+            var hotkeyError = ValidateHotkeys(new Dictionary<WorkflowType, string>
+            {
+                [WorkflowType.Transcription] = TranscriptionHotkeyBox.Text.Trim(),
+                [WorkflowType.TextImprover] = TextImproverHotkeyBox.Text.Trim(),
+                [WorkflowType.DampfAblassen] = DampfHotkeyBox.Text.Trim(),
+                [WorkflowType.EmojiText] = EmojiHotkeyBox.Text.Trim()
+            });
+
+            if (hotkeyError is not null)
+            {
+                SaveStatusText.Text = hotkeyError;
+                return;
+            }
+
+            await settingsStore.SaveAsync(settings);
+            SettingsSaved?.Invoke(this, EventArgs.Empty);
+            SaveStatusText.Text = "Gespeichert.";
+        }
+        catch (Exception ex)
+        {
+            SaveStatusText.Text = ex.Message;
+        }
+    }
+
+    private void CollectSettingsFromUI()
+    {
+        settings.Language = LanguageBox.SelectedIndex switch
+        {
+            1 => "en",
+            2 => "",
+            _ => "de"
+        };
+        settings.TranscriptionModel = string.IsNullOrWhiteSpace(TranscriptionModelBox.Text)
+            ? "gpt-4o-mini-transcribe"
+            : TranscriptionModelBox.Text.Trim();
+        settings.HotkeyMode = HotkeyModeBox.SelectedIndex == 1 ? HotkeyMode.Hold : HotkeyMode.Toggle;
+        settings.AutoPaste = AutoPasteBox.IsChecked == true;
+settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
+        settings.DoubleTapModifier = DoubleTapModifierBox.SelectedIndex switch
+        {
+            1 => ModifierKey.Alt,
+            2 => ModifierKey.Shift,
+            _ => ModifierKey.Ctrl
+        };
+        settings.PreRollEnabled = PreRollEnabledBox.IsChecked == true;
+        settings.UseRealtimeTranscription = RealtimeBox.IsChecked == true;
+        settings.AudioInputDeviceNumber = MicrophoneBox.SelectedValue is int selectedMicrophone
+            ? selectedMicrophone
+            : 0;
+        settings.WorkflowHotkeys[WorkflowType.Transcription] = TranscriptionHotkeyBox.Text.Trim();
+        settings.WorkflowHotkeys[WorkflowType.TextImprover] = TextImproverHotkeyBox.Text.Trim();
+        settings.WorkflowHotkeys[WorkflowType.DampfAblassen] = DampfHotkeyBox.Text.Trim();
+        settings.WorkflowHotkeys[WorkflowType.EmojiText] = EmojiHotkeyBox.Text.Trim();
+        settings.TextImprovement.Tone = ToneBox.SelectedIndex switch
+        {
+            0 => TextTone.Formal,
+            2 => TextTone.Casual,
+            3 => TextTone.JornMinimal,
+            4 => TextTone.JornCommands,
+            _ => TextTone.Neutral
+        };
+        settings.TextImprovement.SkipRewrite = SkipRewriteBox.IsChecked == true;
+        settings.TextImprovement.Context = ContextBox.Text.Trim();
+        settings.TextImprovement.SystemPrompt = TextPromptBox.Text.Trim();
+        settings.DampfAblassen.SystemPrompt = PromptBuilder.ShouldReplaceLegacyDampfPrompt(DampfPromptBox.Text)
+            ? PromptBuilder.DefaultDampfAblassenPrompt
+            : DampfPromptBox.Text.Trim();
+        settings.EmojiText.EmojiDensity = EmojiDensityBox.SelectedIndex switch
+        {
+            0 => EmojiDensity.Wenig,
+            2 => EmojiDensity.Viel,
+            _ => EmojiDensity.Mittel
+        };
+        settings.CustomTerms = CustomTermsBox.Text
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        settings.DebugMode = DebugModeBox.IsChecked == true;
     }
 
     private void CheckMicrophone_Click(object sender, RoutedEventArgs e)
     {
         RefreshMicrophoneStatus();
     }
-
 
     private void RefreshMicrophoneStatus()
     {
@@ -174,6 +278,7 @@ public partial class SettingsWindow : Window
         HotkeyHelpText.Text = $"Hotkey gesetzt: {hotkey}";
         _captureModifiersPeak = ModifierKeys.None;
         Keyboard.ClearFocus();
+        _ = AutoSave();
     }
 
     private void HotkeyBox_PreviewKeyUp(object sender, System.Windows.Input.KeyEventArgs e)
@@ -206,6 +311,7 @@ public partial class SettingsWindow : Window
         HotkeyHelpText.Text = $"Hotkey gesetzt: {hotkey}";
         _captureModifiersPeak = ModifierKeys.None;
         Keyboard.ClearFocus();
+        _ = AutoSave();
     }
 
     private void ResetHotkeys_Click(object sender, RoutedEventArgs e)
@@ -215,7 +321,8 @@ public partial class SettingsWindow : Window
         TextImproverHotkeyBox.Text = defaults[WorkflowType.TextImprover];
         DampfHotkeyBox.Text = defaults[WorkflowType.DampfAblassen];
         EmojiHotkeyBox.Text = defaults[WorkflowType.EmojiText];
-        HotkeyHelpText.Text = "Standard-Hotkeys wiederhergestellt. Bitte speichern, damit sie aktiv werden.";
+        HotkeyHelpText.Text = "Standard-Hotkeys wiederhergestellt.";
+        _ = AutoSave();
     }
 
     private void PasteApiKey_Click(object sender, RoutedEventArgs e)
@@ -267,83 +374,6 @@ public partial class SettingsWindow : Window
         SaveStatusText.Text = "API Key gelöscht.";
     }
 
-    private async void SaveSettings_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            settings.Language = string.IsNullOrWhiteSpace(LanguageBox.Text) ? "de" : LanguageBox.Text.Trim();
-            settings.TranscriptionModel = string.IsNullOrWhiteSpace(TranscriptionModelBox.Text)
-                ? "gpt-4o-mini-transcribe"
-                : TranscriptionModelBox.Text.Trim();
-            settings.HotkeyMode = HotkeyModeBox.SelectedIndex == 1 ? HotkeyMode.Hold : HotkeyMode.Toggle;
-            settings.AutoPaste = AutoPasteBox.IsChecked == true;
-            settings.AutoPasteDelay = AutoPasteDelayBox.IsChecked == true;
-            settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
-            settings.DoubleTapModifier = DoubleTapModifierBox.SelectedIndex switch
-            {
-                1 => ModifierKey.Alt,
-                2 => ModifierKey.Shift,
-                _ => ModifierKey.Ctrl
-            };
-            settings.PreRollEnabled = PreRollEnabledBox.IsChecked == true;
-            settings.AudioInputDeviceNumber = MicrophoneBox.SelectedValue is int selectedMicrophone
-                ? selectedMicrophone
-                : 0;
-
-            var hotkeys = new Dictionary<WorkflowType, string>
-            {
-                [WorkflowType.Transcription] = TranscriptionHotkeyBox.Text.Trim(),
-                [WorkflowType.TextImprover] = TextImproverHotkeyBox.Text.Trim(),
-                [WorkflowType.DampfAblassen] = DampfHotkeyBox.Text.Trim(),
-                [WorkflowType.EmojiText] = EmojiHotkeyBox.Text.Trim()
-            };
-
-            var hotkeyError = ValidateHotkeys(hotkeys);
-            if (hotkeyError is not null)
-            {
-                SaveStatusText.Text = hotkeyError;
-                return;
-            }
-
-            settings.WorkflowHotkeys[WorkflowType.Transcription] = TranscriptionHotkeyBox.Text.Trim();
-            settings.WorkflowHotkeys[WorkflowType.TextImprover] = TextImproverHotkeyBox.Text.Trim();
-            settings.WorkflowHotkeys[WorkflowType.DampfAblassen] = DampfHotkeyBox.Text.Trim();
-            settings.WorkflowHotkeys[WorkflowType.EmojiText] = EmojiHotkeyBox.Text.Trim();
-            settings.TextImprovement.Tone = ToneBox.SelectedIndex switch
-            {
-                0 => TextTone.Formal,
-                2 => TextTone.Casual,
-                3 => TextTone.JornMinimal,
-                4 => TextTone.JornCommands,
-                _ => TextTone.Neutral
-            };
-            settings.TextImprovement.Context = ContextBox.Text.Trim();
-            settings.TextImprovement.SystemPrompt = TextPromptBox.Text.Trim();
-            settings.DampfAblassen.SystemPrompt = PromptBuilder.ShouldReplaceLegacyDampfPrompt(DampfPromptBox.Text)
-                ? PromptBuilder.DefaultDampfAblassenPrompt
-                : DampfPromptBox.Text.Trim();
-            settings.EmojiText.EmojiDensity = EmojiDensityBox.SelectedIndex switch
-            {
-                0 => EmojiDensity.Wenig,
-                2 => EmojiDensity.Viel,
-                _ => EmojiDensity.Mittel
-            };
-            settings.CustomTerms = CustomTermsBox.Text
-                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            settings.DebugMode = DebugModeBox.IsChecked == true;
-
-            await settingsStore.SaveAsync(settings);
-            SettingsSaved?.Invoke(this, EventArgs.Empty);
-            SaveStatusText.Text = "Gespeichert.";
-        }
-        catch (Exception ex)
-        {
-            SaveStatusText.Text = ex.Message;
-        }
-    }
-
     private static string? ValidateHotkeys(Dictionary<WorkflowType, string> hotkeys)
     {
         foreach (var (type, hotkey) in hotkeys)
@@ -385,36 +415,15 @@ public partial class SettingsWindow : Window
         }
 
         var parts = new List<string>();
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
-        {
-            parts.Add("Ctrl");
-        }
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) parts.Add("Ctrl");
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) parts.Add("Alt");
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Windows)) parts.Add("Win");
 
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
-        {
-            parts.Add("Alt");
-        }
-
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
-        {
-            parts.Add("Shift");
-        }
-
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Windows))
-        {
-            parts.Add("Win");
-        }
-
-        if (parts.Count == 0)
-        {
-            return null;
-        }
+        if (parts.Count == 0) return null;
 
         var keyText = KeyToText(key);
-        if (keyText is null)
-        {
-            return null;
-        }
+        if (keyText is null) return null;
 
         parts.Add(keyText);
         return string.Join("+", parts);
@@ -422,25 +431,10 @@ public partial class SettingsWindow : Window
 
     private static string? KeyToText(Key key)
     {
-        if (key is >= Key.A and <= Key.Z)
-        {
-            return key.ToString();
-        }
-
-        if (key is >= Key.D0 and <= Key.D9)
-        {
-            return ((int)(key - Key.D0)).ToString();
-        }
-
-        if (key is >= Key.NumPad0 and <= Key.NumPad9)
-        {
-            return ((int)(key - Key.NumPad0)).ToString();
-        }
-
-        if (key is >= Key.F1 and <= Key.F24)
-        {
-            return key.ToString();
-        }
+        if (key is >= Key.A and <= Key.Z) return key.ToString();
+        if (key is >= Key.D0 and <= Key.D9) return ((int)(key - Key.D0)).ToString();
+        if (key is >= Key.NumPad0 and <= Key.NumPad9) return ((int)(key - Key.NumPad0)).ToString();
+        if (key is >= Key.F1 and <= Key.F24) return key.ToString();
 
         return key switch
         {
