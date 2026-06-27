@@ -31,6 +31,7 @@ public sealed class TrayController : IDisposable
     private IRealtimeTranscriptionSession? activeSession;
     private string? activeSessionPrompt;
     private string? activeContext;
+    private CursorSurroundings? activeSurroundings;
     private bool disposed;
 
     public TrayController(
@@ -183,10 +184,11 @@ public sealed class TrayController : IDisposable
             StartRealtimeSession(type);
             audioRecorder.Arm();
 
-            // Kontext-Modus: angefangenen Satz links vom Cursor lesen, solange der Fokus noch in der
-            // Zielapp liegt (Overlay/Toolbar sind WS_EX_NOACTIVATE). Nach dem Armen, damit währenddessen
+            // Kontext-Modus: Text rund um den Cursor lesen, solange der Fokus noch in der Zielapp
+            // liegt (Overlay/Toolbar sind WS_EX_NOACTIVATE). Nach dem Armen, damit währenddessen
             // gesprochenes Audio in den Pre-Roll/Recorder läuft und nicht verloren geht.
-            activeContext = CaptureContext(type);
+            activeSurroundings = CaptureSurroundings(type);
+            activeContext = activeSurroundings is null ? null : SentenceContext.CurrentSentence(activeSurroundings.Preceding);
 
             activeWorkflow = type;
             SetStatus($"{type.DisplayName()}: Aufnahme läuft");
@@ -203,17 +205,31 @@ public sealed class TrayController : IDisposable
         }
     }
 
-    // Liest im Kontext-Modus den angefangenen Satz links vom Cursor; sonst kein Kontext.
-    private string? CaptureContext(WorkflowType type)
+    // Liest im Kontext-Modus den Text rund um den Cursor; sonst kein Kontext.
+    private CursorSurroundings? CaptureSurroundings(WorkflowType type)
     {
         if (type != WorkflowType.BlitzBriefKontext)
         {
             return null;
         }
 
-        var context = cursorContextReader.ReadCurrentSentence();
-        AppLog.Write($"Kontext gelesen: {(context is null ? "<null>" : $"\"{context}\"")}");
-        return context;
+        var surroundings = cursorContextReader.Read();
+        var sentence = SentenceContext.CurrentSentence(surroundings.Preceding);
+        AppLog.Write($"Kontext gelesen: links={(sentence is null ? "<null>" : $"\"{sentence}\"")} " +
+                     $"rechtsLänge={surroundings.Following?.Length ?? 0}");
+        return surroundings;
+    }
+
+    // Kontext-Modus: Diktat passend zur Einfügestelle formen (Leerzeichen links/rechts, Auto-Punkt
+    // bei Satzeinschub entfernen). Andere Modi: bisheriges Verhalten – immer ein Leerzeichen anhängen.
+    private static string ComposeInsertText(WorkflowType type, string text, CursorSurroundings? surroundings)
+    {
+        if (type == WorkflowType.BlitzBriefKontext && surroundings is not null)
+        {
+            return SmartInsert.Format(text, surroundings.Preceding, surroundings.Following);
+        }
+
+        return text + " ";
     }
 
     private void StartRealtimeSession(WorkflowType type)
@@ -266,9 +282,11 @@ public sealed class TrayController : IDisposable
         var session = activeSession;
         var sessionPrompt = activeSessionPrompt;
         var context = activeContext;
+        var surroundings = activeSurroundings;
         activeSession = null;
         activeSessionPrompt = null;
         activeContext = null;
+        activeSurroundings = null;
 
         try
         {
@@ -290,9 +308,8 @@ public sealed class TrayController : IDisposable
 
             var result = await workflowRunner.ProcessAsync(type, audio, token);
             AppLog.Write($"StopAndProcess result chars={result.Text.Length} totalMs={totalStopwatch.ElapsedMilliseconds} realtime={(realtimeTranscript is not null)} preview={result.Text[..Math.Min(60, result.Text.Length)]}");
-            // Abschließendes Leerzeichen, damit das nächste Diktat nahtlos anschließt
-            // und der Nutzer es nicht jedes Mal von Hand setzen muss.
-            clipboardPasteService.CopyText(result.Text + " ");
+            var insertText = ComposeInsertText(type, result.Text, surroundings);
+            clipboardPasteService.CopyText(insertText);
             if (settings.AutoPaste)
             {
                 await clipboardPasteService.PasteAsync(token);
@@ -394,6 +411,7 @@ public sealed class TrayController : IDisposable
         audioRecorder.Cancel();
         activeWorkflow = null;
         activeContext = null;
+        activeSurroundings = null;
         HideOverlay();
         SetStatus("BlitzBrief bereit");
     }

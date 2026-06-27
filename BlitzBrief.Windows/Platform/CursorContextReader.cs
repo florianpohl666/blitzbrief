@@ -7,7 +7,7 @@ using BlitzBrief.Core;
 namespace BlitzBrief.Windows.Platform;
 
 /// <summary>
-/// Liest den Satz links vom Cursor aus der Vordergrund-App. Strategie-Kette:
+/// Liest den Text links und rechts vom Cursor in der Vordergrund-App. Strategie-Kette:
 /// 1. Office-COM für Word/Outlook-Desktop (präzise),
 /// 2. UI Automation / TextPattern (universell, zerstörungsfrei) für alles andere.
 /// Kein Clipboard-Trick (bewusst zerstörungsfrei). UIA/COM laufen auf einem MTA-Thread
@@ -15,33 +15,32 @@ namespace BlitzBrief.Windows.Platform;
 /// </summary>
 public sealed class CursorContextReader(Action<string>? log = null) : ICursorContextReader
 {
-    // Wie viel Text links vom Cursor wir maximal anfordern; SentenceContext kürzt auf den Satz.
+    // Wie viel Text je Seite wir maximal anfordern; Core kürzt links auf den Satz und prüft
+    // rechts nur die unmittelbare Umgebung.
     private const int PrecedingChars = 400;
+    private const int FollowingChars = 160;
     private const int ReadTimeoutMs = 600;
 
-    public string? ReadCurrentSentence()
-    {
-        var preceding = RunOnMtaWithTimeout(ReadPrecedingText, ReadTimeoutMs);
-        return SentenceContext.CurrentSentence(preceding);
-    }
+    public CursorSurroundings Read() =>
+        RunOnMtaWithTimeout(ReadSurroundings, ReadTimeoutMs) ?? CursorSurroundings.Empty;
 
-    private string? ReadPrecedingText()
+    private CursorSurroundings? ReadSurroundings()
     {
         try
         {
             var process = ForegroundProcessName();
             if (string.Equals(process, "WINWORD", StringComparison.OrdinalIgnoreCase))
             {
-                var viaCom = TryReadOffice("Word.Application", ReadWordPreceding);
-                if (!string.IsNullOrEmpty(viaCom))
+                var viaCom = TryReadOffice("Word.Application", ReadWord);
+                if (viaCom is not null)
                 {
                     return viaCom;
                 }
             }
             else if (string.Equals(process, "OUTLOOK", StringComparison.OrdinalIgnoreCase))
             {
-                var viaCom = TryReadOffice("Outlook.Application", ReadOutlookPreceding);
-                if (!string.IsNullOrEmpty(viaCom))
+                var viaCom = TryReadOffice("Outlook.Application", ReadOutlook);
+                if (viaCom is not null)
                 {
                     return viaCom;
                 }
@@ -51,14 +50,14 @@ public sealed class CursorContextReader(Action<string>? log = null) : ICursorCon
         }
         catch (Exception ex)
         {
-            log?.Invoke($"CursorContextReader.ReadPrecedingText failed: {ex.Message}");
+            log?.Invoke($"CursorContextReader.ReadSurroundings failed: {ex.Message}");
             return null;
         }
     }
 
     // ── UI Automation (universell, zerstörungsfrei) ──────────────────────────
 
-    private string? ReadViaUia()
+    private CursorSurroundings? ReadViaUia()
     {
         try
         {
@@ -75,13 +74,19 @@ public sealed class CursorContextReader(Action<string>? log = null) : ICursorCon
                 return null;
             }
 
-            // Range vom Selektionsanfang (= Einfügemarke) um PrecedingChars nach links spannen.
-            // So lesen wir nur Text VOR dem Cursor, auch wenn rechts etwas selektiert ist.
-            var range = selection[0].Clone();
-            range.MoveEndpointByRange(TextPatternRangeEndpoint.End, selection[0], TextPatternRangeEndpoint.Start);
-            range.MoveEndpointByUnit(TextPatternRangeEndpoint.Start, TextUnit.Character, -PrecedingChars);
-            var text = range.GetText(-1);
-            return string.IsNullOrEmpty(text) ? null : text;
+            var caret = selection[0];
+
+            // Links: vom Selektionsanfang (= Einfügemarke) um PrecedingChars nach links.
+            var left = caret.Clone();
+            left.MoveEndpointByRange(TextPatternRangeEndpoint.End, caret, TextPatternRangeEndpoint.Start);
+            left.MoveEndpointByUnit(TextPatternRangeEndpoint.Start, TextUnit.Character, -PrecedingChars);
+
+            // Rechts: vom Selektionsende um FollowingChars nach rechts.
+            var right = caret.Clone();
+            right.MoveEndpointByRange(TextPatternRangeEndpoint.Start, caret, TextPatternRangeEndpoint.End);
+            right.MoveEndpointByUnit(TextPatternRangeEndpoint.End, TextUnit.Character, FollowingChars);
+
+            return new CursorSurroundings(Nullable(left.GetText(-1)), Nullable(right.GetText(-1)));
         }
         catch (Exception ex)
         {
@@ -92,7 +97,7 @@ public sealed class CursorContextReader(Action<string>? log = null) : ICursorCon
 
     // ── Office-COM (präzise für Word/Outlook-Desktop) ────────────────────────
 
-    private string? TryReadOffice(string progId, Func<dynamic, string?> read)
+    private CursorSurroundings? TryReadOffice(string progId, Func<dynamic, CursorSurroundings?> read)
     {
         object? app = null;
         try
@@ -114,22 +119,9 @@ public sealed class CursorContextReader(Action<string>? log = null) : ICursorCon
         }
     }
 
-    private static string? ReadWordPreceding(dynamic app)
-    {
-        dynamic selection = app.Selection;
-        int caret = selection.Start;
-        if (caret <= 0)
-        {
-            return null;
-        }
+    private static CursorSurroundings? ReadWord(dynamic app) => ReadWordDocument(app.Selection.Document, app.Selection);
 
-        int from = Math.Max(0, caret - PrecedingChars);
-        dynamic document = selection.Document;
-        dynamic range = document.Range(from, caret);
-        return range.Text as string;
-    }
-
-    private static string? ReadOutlookPreceding(dynamic app)
+    private static CursorSurroundings? ReadOutlook(dynamic app)
     {
         dynamic inspector = app.ActiveInspector();
         if (inspector is null)
@@ -139,35 +131,37 @@ public sealed class CursorContextReader(Action<string>? log = null) : ICursorCon
 
         // Outlook-Mailtext ist ein Word-Dokument (WordEditor) – dieselbe Range-Logik wie Word.
         dynamic document = inspector.WordEditor;
-        if (document is null)
-        {
-            return null;
-        }
+        return document is null ? null : ReadWordDocument(document, document.Application.Selection);
+    }
 
-        dynamic selection = document.Application.Selection;
-        int caret = selection.Start;
-        if (caret <= 0)
-        {
-            return null;
-        }
+    private static CursorSurroundings? ReadWordDocument(dynamic document, dynamic selection)
+    {
+        int selStart = selection.Start;
+        int selEnd = selection.End;
+        int docEnd = document.Content.End;
 
-        int from = Math.Max(0, caret - PrecedingChars);
-        dynamic range = document.Range(from, caret);
-        return range.Text as string;
+        int from = Math.Max(0, selStart - PrecedingChars);
+        int to = Math.Min(selEnd + FollowingChars, docEnd);
+
+        string? preceding = selStart > from ? document.Range(from, selStart).Text as string : null;
+        string? following = to > selEnd ? document.Range(selEnd, to).Text as string : null;
+        return new CursorSurroundings(Nullable(preceding), Nullable(following));
     }
 
     // ── Helfer ───────────────────────────────────────────────────────────────
 
+    private static string? Nullable(string? text) => string.IsNullOrEmpty(text) ? null : text;
+
     // UIA-Clientaufrufe gehören in einen MTA-Apartment; der WPF-UI-Thread ist STA und kann
     // dort hängen/langsam sein. Eigener MTA-Thread mit Timeout = nie blockierender Start.
-    private string? RunOnMtaWithTimeout(Func<string?> work, int timeoutMs)
+    private CursorSurroundings? RunOnMtaWithTimeout(Func<CursorSurroundings?> work, int timeoutMs)
     {
         if (Thread.CurrentThread.GetApartmentState() == ApartmentState.MTA)
         {
             return work();
         }
 
-        string? result = null;
+        CursorSurroundings? result = null;
         var thread = new Thread(() =>
         {
             try { result = work(); }

@@ -1,13 +1,21 @@
 namespace BlitzBrief.Core;
 
 /// <summary>
-/// Liest den bereits geschriebenen Text links vom Cursor in der Vordergrund-Anwendung,
-/// reduziert auf den aktuell angefangenen Satz (für die Fortsetzung im Kontext-Modus).
-/// Liefert <c>null</c>, wenn kein Kontext verfügbar ist: App ohne Textzugriff, Cursor am
-/// Satzanfang/-ende, Lese- oder Zeitüberschreitungsfehler. Plattformneutral; die
-/// Windows-Implementierung sitzt in BlitzBrief.Windows (UI Automation + Office-COM).
+/// Roher Text unmittelbar links und rechts vom Cursor in der Vordergrund-App (untrimmt, wie
+/// gelesen). Felder sind <c>null</c>, wenn an der Seite kein Text vorliegt oder das Lesen
+/// fehlschlug. Daraus leiten <see cref="SentenceContext"/> und <see cref="SmartInsert"/> den
+/// Satzkontext (für den whisper-Prompt) bzw. das passende Einfügen ab.
+/// </summary>
+public sealed record CursorSurroundings(string? Preceding, string? Following)
+{
+    public static readonly CursorSurroundings Empty = new(null, null);
+}
+
+/// <summary>
+/// Liest den Text rund um den Cursor. Plattformneutral; die Windows-Implementierung sitzt in
+/// BlitzBrief.Windows (UI Automation + Office-COM), zerstörungsfrei und ohne Clipboard.
 /// </summary>
 public interface ICursorContextReader
 {
-    string? ReadCurrentSentence();
+    CursorSurroundings Read();
 }
