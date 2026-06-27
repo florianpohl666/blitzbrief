@@ -188,6 +188,33 @@ public static class TranscriptionQualityService
                CommonArtifacts.Any(artifact => text.Contains(artifact, StringComparison.OrdinalIgnoreCase));
     }
 
+    // Bei (fast) leerem oder sehr kurzem Audio halluziniert das Transkriptionsmodell teils
+    // lange, plausibel klingende Textwände (z.B. eine Standard-AGB oder einen Lehrtext).
+    // Solche Halluzinationen sind weder ein bekanntes Kurz-Artefakt (IsLikelyArtifact) noch
+    // ein Prompt-Echo (IsPromptEcho) und rutschen sonst ungefiltert durch. Verlässliches
+    // Erkennungsmerkmal ist die Sprechrate: selbst sehr schnelle Sprecher bringen keine
+    // zweistellige Wörter/Sekunde-Rate über viele Wörter hinweg zustande – eine deutlich
+    // höhere Rate ist physikalisch unmöglich und damit ein sicheres Halluzinations-Signal.
+    // Die Mindestwortzahl schützt kurze, legitime Diktate, bei denen die Rate verrauscht ist.
+    private const double MaxPlausibleWordsPerSecond = 8.0;
+    private const int HallucinationMinWords = 12;
+
+    public static bool IsImplausiblyFast(string transcript, TimeSpan duration)
+    {
+        if (string.IsNullOrWhiteSpace(transcript) || duration.TotalSeconds <= 0)
+        {
+            return false;
+        }
+
+        var words = EchoTokens(transcript).Length;
+        if (words < HallucinationMinWords)
+        {
+            return false;
+        }
+
+        return words / duration.TotalSeconds > MaxPlausibleWordsPerSecond;
+    }
+
     // Bei (fast) leerem Audio spiegelt das Transkriptionsmodell den mitgesendeten
     // Prompt zurück. Da wir den Prompt kennen, erkennen wir dieses Echo: stimmt ein
     // großer Wortanteil des Transkripts mit dem Prompt überein, ist es kein echtes

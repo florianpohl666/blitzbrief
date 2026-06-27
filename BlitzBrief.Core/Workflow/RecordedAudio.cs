@@ -10,4 +10,5 @@ public sealed record RecordedAudio(
     int SampleRate,
     TimeSpan Duration,
     string? RealtimeTranscript = null,
-    string? RealtimePrompt = null);
+    string? RealtimePrompt = null,
+    string? PrecedingContext = null);

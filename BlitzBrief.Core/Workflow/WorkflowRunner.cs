@@ -14,6 +14,16 @@ public sealed class WorkflowRunner(
     // spiegelt das Modell den Prompt bei (fast) leerem Audio zurück.
     private const double MinPromptAudioSeconds = 0.9;
 
+    // Der Kontext-Modus braucht whisper-1: NUR dieses Modell setzt den angefangenen Satz
+    // grammatisch korrekt fort (gpt-4o-(mini-)transcribe schreibt Satzanfänge per Formatter
+    // immer groß und ignoriert jeden Fortsetzungs-Prompt – per Spike + OpenAI-Doku belegt).
+    // whisper-1 ist batch-only; der Realtime-Pfad wird dafür automatisch übersprungen.
+    public const string KontextTranscriptionModel = "whisper-1";
+
+    /// <summary>Transkriptionsmodell für den Workflow – whisper-1 nur im Kontext-Modus, sonst die Einstellung.</summary>
+    public static string TranscriptionModelFor(WorkflowType type, AppSettings settings) =>
+        type == WorkflowType.BlitzBriefKontext ? KontextTranscriptionModel : settings.TranscriptionModel;
+
     public async Task<WorkflowResult> ProcessAsync(
         WorkflowType type,
         RecordedAudio audio,
@@ -32,9 +42,8 @@ public sealed class WorkflowRunner(
         }
 
         var hasEnoughAudio = audio.Duration.TotalSeconds >= MinPromptAudioSeconds;
-        var useCommandHints = type == WorkflowType.TextImprover &&
-                              settings.TextImprovement.Tone == TextTone.JornCommands &&
-                              hasEnoughAudio;
+        var useCommandHints = PromptBuilder.UsesJornCommands(type, settings) && hasEnoughAudio;
+        var model = TranscriptionModelFor(type, settings);
 
         // Transkript besorgen: bevorzugt aus dem Realtime-Stream, sonst per Batch-Upload.
         // echoPrompt = der Prompt, mit dem das aktuelle Transkript entstanden ist (für die Echo-Prüfung).
@@ -47,8 +56,9 @@ public sealed class WorkflowRunner(
         }
         else
         {
-            echoPrompt = PromptBuilder.BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio);
-            var rawText = await TranscribeBatchAsync(audio, apiKey, settings.Language, echoPrompt, settings.TranscriptionModel, cancellationToken);
+            // Kontext-Modus: angefangener Satz links vom Cursor wird an den Prompt gehängt.
+            echoPrompt = PromptBuilder.BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio, audio.PrecedingContext);
+            var rawText = await TranscribeBatchAsync(audio, apiKey, settings.Language, echoPrompt, model, cancellationToken);
             cleaned = TranscriptionQualityService.CleanedTranscript(rawText);
         }
 
@@ -59,13 +69,18 @@ public sealed class WorkflowRunner(
             (TranscriptionQualityService.IsLikelyArtifact(cleaned, audio.Duration) ||
              TranscriptionQualityService.IsPromptEcho(cleaned, echoPrompt)))
         {
-            var retryText = await TranscribeBatchAsync(audio, apiKey, settings.Language, null, settings.TranscriptionModel, cancellationToken);
+            var retryText = await TranscribeBatchAsync(audio, apiKey, settings.Language, null, model, cancellationToken);
             cleaned = TranscriptionQualityService.CleanedTranscript(retryText);
         }
 
         // Nach dem Retry kann kein Prompt-Echo mehr vorliegen (kein Prompt gesendet);
-        // bleibt nur der echte Leerfall.
-        if (TranscriptionQualityService.IsLikelyArtifact(cleaned, audio.Duration))
+        // bleibt der echte Leerfall ODER eine reine Halluzination: eine lange, plausibel
+        // klingende Textwand (z.B. Standard-AGB), die das Modell bei fast leerem Audio
+        // erfindet. Sie ist kein Kurz-Artefakt und kein Prompt-Echo, verrät sich aber über
+        // die physikalisch unmögliche Sprechrate. Ein prompt-loser Retry würde hier nur
+        // erneut halluzinieren – daher direkt verwerfen.
+        if (TranscriptionQualityService.IsLikelyArtifact(cleaned, audio.Duration) ||
+            TranscriptionQualityService.IsImplausiblyFast(cleaned, audio.Duration))
         {
             throw new EmptyRecordingException("Keine Aufnahme erkannt.");
         }
@@ -87,6 +102,9 @@ public sealed class WorkflowRunner(
         var jornMode = settings.TextImprovement.Tone is TextTone.JornMinimal or TextTone.JornCommands;
         var rewritten = type switch
         {
+            // Fest verdrahtet: Transkription + Jörn-2-Kommandoersetzung (in stage1), ohne GPT-Rewrite.
+            // Kontext-Modus zusätzlich mit Vortext im whisper-1-Prompt (oben), Nachverarbeitung identisch.
+            WorkflowType.BlitzBriefEasy or WorkflowType.BlitzBriefKontext => stage1,
             WorkflowType.TextImprover when settings.TextImprovement.SkipRewrite => stage1,
             WorkflowType.TextImprover => await RewriteAsync(
                 stage1,

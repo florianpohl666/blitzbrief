@@ -85,14 +85,35 @@ public static class PromptBuilder
     /// (Dauer noch unbekannt -> hasEnoughAudio: true) als auch im Batch-Fallback (Dauer bekannt)
     /// genutzt, damit beide Pfade identisch primen.
     /// </summary>
-    public static string? BuildWorkflowWhisperPrompt(WorkflowType type, AppSettings settings, bool hasEnoughAudio)
+    public static string? BuildWorkflowWhisperPrompt(
+        WorkflowType type, AppSettings settings, bool hasEnoughAudio, string? precedingSentence = null)
     {
-        var useCommandHints = type == WorkflowType.TextImprover &&
-                              settings.TextImprovement.Tone == TextTone.JornCommands &&
-                              hasEnoughAudio;
+        var useCommandHints = UsesJornCommands(type, settings) && hasEnoughAudio;
         var customTerms = hasEnoughAudio ? settings.CustomTerms : (IReadOnlyList<string>)[];
-        return BuildWhisperPrompt(customTerms, useCommandHints, settings.Language);
+        var basePrompt = BuildWhisperPrompt(customTerms, useCommandHints, settings.Language);
+
+        // Vortext (angefangener Satz links vom Cursor) nur bei ausreichend Audio anhängen –
+        // sonst spiegelt das Modell ihn bei Stille zurück. whisper-1 wertet nur die letzten
+        // ~224 Tokens aus, daher der rohe Satz ans ENDE: so konditioniert er die Fortsetzung
+        // (Groß-/Kleinschreibung). Per Spike bestätigt – nur whisper-1 wirkt hier, siehe
+        // Memory kontext-mode-whisper1 bzw. WorkflowRunner.KontextTranscriptionModel.
+        if (hasEnoughAudio && !string.IsNullOrWhiteSpace(precedingSentence))
+        {
+            var fragment = precedingSentence.Trim();
+            return string.IsNullOrEmpty(basePrompt) ? fragment : basePrompt + " " + fragment;
+        }
+
+        return basePrompt;
     }
+
+    /// <summary>
+    /// Trifft die Jörn-2-Verarbeitung zu (juristischer Kommando-Prompt beim Transkribieren
+    /// und anschließende Kommandoersetzung)? Gilt für "Text verbessern" mit Stil "Jörn 2" und
+    /// für die fest verdrahteten Modi "Blitzbrief-Easy" und "Blitzbrief-Kontext".
+    /// </summary>
+    public static bool UsesJornCommands(WorkflowType type, AppSettings settings) =>
+        type is WorkflowType.BlitzBriefEasy or WorkflowType.BlitzBriefKontext ||
+        (type == WorkflowType.TextImprover && settings.TextImprovement.Tone == TextTone.JornCommands);
 
     private static string? LanguageDirectiveName(string language) => language.Trim().ToLowerInvariant() switch
     {

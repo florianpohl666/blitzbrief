@@ -28,6 +28,44 @@ public sealed class TranscriptionQualityServiceTests
     }
 
     [Fact]
+    public void IsImplausiblyFast_VerwirftHalluzinierteTextwand()
+    {
+        // Vom Nutzer gemeldet: ein Bruchteil-Sekunden-Diktat liefert eine lange,
+        // plausibel klingende AGB-Textwand – eine Halluzination bei fast leerem Audio.
+        const string agbWall =
+            "§ 1 Allgemeines (1) Für die Geschäftsbeziehung zwischen dem Verkäufer und dem " +
+            "Käufer gelten ausschließlich diese Allgemeinen Geschäftsbedingungen. Abweichende " +
+            "Bedingungen des Käufers werden nicht anerkannt, es sei denn, der Verkäufer stimmt " +
+            "ihrer Geltung ausdrücklich schriftlich zu.";
+
+        Assert.True(TranscriptionQualityService.IsImplausiblyFast(agbWall, TimeSpan.FromMilliseconds(500)));
+    }
+
+    [Fact]
+    public void IsImplausiblyFast_LaesstNormalesDiktatDurch()
+    {
+        // 12 Wörter in 5 Sekunden = realistische Sprechrate (~2,4 Wörter/Sekunde).
+        const string text = "Bitte teilen Sie mir den aktuellen Stand der Sache bis morgen mit.";
+        Assert.False(TranscriptionQualityService.IsImplausiblyFast(text, TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public void IsImplausiblyFast_KurzesDiktat_BleibtUnberuehrt()
+    {
+        // Wenige Wörter: die Rate ist verrauscht und darf nicht als Halluzination zählen,
+        // selbst wenn die Aufnahme kurz ist.
+        Assert.False(TranscriptionQualityService.IsImplausiblyFast("Komma", TimeSpan.FromMilliseconds(400)));
+        Assert.False(TranscriptionQualityService.IsImplausiblyFast("ja genau danke schön", TimeSpan.FromMilliseconds(600)));
+    }
+
+    [Fact]
+    public void IsImplausiblyFast_OhneTextOderDauer_IstFalse()
+    {
+        Assert.False(TranscriptionQualityService.IsImplausiblyFast("", TimeSpan.FromSeconds(1)));
+        Assert.False(TranscriptionQualityService.IsImplausiblyFast("ein langer satz der genug woerter hat um zu zaehlen", TimeSpan.Zero));
+    }
+
+    [Fact]
     public void IsPromptEcho_ErkenntZurueckgespiegeltenWhisperPrompt()
     {
         var prompt = PromptBuilder.BuildWhisperPrompt([], includeCommandHints: true);

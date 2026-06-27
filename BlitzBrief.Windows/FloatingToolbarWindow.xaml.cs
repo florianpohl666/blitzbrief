@@ -46,6 +46,16 @@ public partial class FloatingToolbarWindow : Window
         WorkflowRequested?.Invoke(this, WorkflowType.TextImprover);
     }
 
+    private void BlitzBriefEasy_Click(object sender, RoutedEventArgs e)
+    {
+        WorkflowRequested?.Invoke(this, WorkflowType.BlitzBriefEasy);
+    }
+
+    private void BlitzBriefKontext_Click(object sender, RoutedEventArgs e)
+    {
+        WorkflowRequested?.Invoke(this, WorkflowType.BlitzBriefKontext);
+    }
+
     private void Dampf_Click(object sender, RoutedEventArgs e)
     {
         WorkflowRequested?.Invoke(this, WorkflowType.DampfAblassen);

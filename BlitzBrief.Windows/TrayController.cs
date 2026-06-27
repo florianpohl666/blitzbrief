@@ -18,6 +18,7 @@ public sealed class TrayController : IDisposable
     private readonly ApiKeyStore apiKeyStore;
     private readonly WorkflowRunner workflowRunner;
     private readonly IRealtimeTranscriber realtimeTranscriber;
+    private readonly ICursorContextReader cursorContextReader;
     private readonly Forms.NotifyIcon notifyIcon;
     private readonly HotkeyManager hotkeyManager = new();
     private readonly AudioRecorder audioRecorder = new();
@@ -29,6 +30,7 @@ public sealed class TrayController : IDisposable
     private WorkflowType? activeWorkflow;
     private IRealtimeTranscriptionSession? activeSession;
     private string? activeSessionPrompt;
+    private string? activeContext;
     private bool disposed;
 
     public TrayController(
@@ -36,13 +38,15 @@ public sealed class TrayController : IDisposable
         SettingsStore settingsStore,
         ApiKeyStore apiKeyStore,
         WorkflowRunner workflowRunner,
-        IRealtimeTranscriber realtimeTranscriber)
+        IRealtimeTranscriber realtimeTranscriber,
+        ICursorContextReader cursorContextReader)
     {
         this.settings = settings;
         this.settingsStore = settingsStore;
         this.apiKeyStore = apiKeyStore;
         this.workflowRunner = workflowRunner;
         this.realtimeTranscriber = realtimeTranscriber;
+        this.cursorContextReader = cursorContextReader;
 
         notifyIcon = new Forms.NotifyIcon
         {
@@ -92,6 +96,8 @@ public sealed class TrayController : IDisposable
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("BlitzBrief", null, (_, _) => ToggleWorkflow(WorkflowType.Transcription));
         menu.Items.Add("Text verbessern", null, (_, _) => ToggleWorkflow(WorkflowType.TextImprover));
+        menu.Items.Add("Blitzbrief-Easy", null, (_, _) => ToggleWorkflow(WorkflowType.BlitzBriefEasy));
+        menu.Items.Add("Blitzbrief-Kontext", null, (_, _) => ToggleWorkflow(WorkflowType.BlitzBriefKontext));
         menu.Items.Add("Ärger beruhigen", null, (_, _) => ToggleWorkflow(WorkflowType.DampfAblassen));
         menu.Items.Add("Emoji ergänzen", null, (_, _) => ToggleWorkflow(WorkflowType.EmojiText));
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -177,6 +183,11 @@ public sealed class TrayController : IDisposable
             StartRealtimeSession(type);
             audioRecorder.Arm();
 
+            // Kontext-Modus: angefangenen Satz links vom Cursor lesen, solange der Fokus noch in der
+            // Zielapp liegt (Overlay/Toolbar sind WS_EX_NOACTIVATE). Nach dem Armen, damit währenddessen
+            // gesprochenes Audio in den Pre-Roll/Recorder läuft und nicht verloren geht.
+            activeContext = CaptureContext(type);
+
             activeWorkflow = type;
             SetStatus($"{type.DisplayName()}: Aufnahme läuft");
             ShowOverlayListening(type.DisplayName());
@@ -192,12 +203,27 @@ public sealed class TrayController : IDisposable
         }
     }
 
+    // Liest im Kontext-Modus den angefangenen Satz links vom Cursor; sonst kein Kontext.
+    private string? CaptureContext(WorkflowType type)
+    {
+        if (type != WorkflowType.BlitzBriefKontext)
+        {
+            return null;
+        }
+
+        var context = cursorContextReader.ReadCurrentSentence();
+        AppLog.Write($"Kontext gelesen: {(context is null ? "<null>" : $"\"{context}\"")}");
+        return context;
+    }
+
     private void StartRealtimeSession(WorkflowType type)
     {
         activeSession = null;
         activeSessionPrompt = null;
 
-        if (!settings.UseRealtimeTranscription || !IsRealtimeModel(settings.TranscriptionModel))
+        // Kontext-Modus läuft auf whisper-1 (batch-only) → IsRealtimeModel ist false → kein Realtime.
+        var model = WorkflowRunner.TranscriptionModelFor(type, settings);
+        if (!settings.UseRealtimeTranscription || !IsRealtimeModel(model))
         {
             return;
         }
@@ -214,9 +240,9 @@ public sealed class TrayController : IDisposable
             // Audio fängt der Retry-Pfad im WorkflowRunner ab.
             var prompt = PromptBuilder.BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio: true);
             activeSession = realtimeTranscriber.CreateSession(
-                apiKey, settings.TranscriptionModel, settings.Language, prompt, AudioRecorder.SampleRate);
+                apiKey, model, settings.Language, prompt, AudioRecorder.SampleRate);
             activeSessionPrompt = prompt;
-            AppLog.Write($"Realtime session created model={settings.TranscriptionModel}");
+            AppLog.Write($"Realtime session created model={model}");
         }
         catch (Exception ex)
         {
@@ -239,8 +265,10 @@ public sealed class TrayController : IDisposable
         var token = processingCts?.Token ?? CancellationToken.None;
         var session = activeSession;
         var sessionPrompt = activeSessionPrompt;
+        var context = activeContext;
         activeSession = null;
         activeSessionPrompt = null;
+        activeContext = null;
 
         try
         {
@@ -257,7 +285,8 @@ public sealed class TrayController : IDisposable
                 AudioRecorder.SampleRate,
                 recording.Duration,
                 realtimeTranscript,
-                sessionPrompt);
+                sessionPrompt,
+                context);
 
             var result = await workflowRunner.ProcessAsync(type, audio, token);
             AppLog.Write($"StopAndProcess result chars={result.Text.Length} totalMs={totalStopwatch.ElapsedMilliseconds} realtime={(realtimeTranscript is not null)} preview={result.Text[..Math.Min(60, result.Text.Length)]}");
@@ -364,6 +393,7 @@ public sealed class TrayController : IDisposable
         AbortRealtimeSession();
         audioRecorder.Cancel();
         activeWorkflow = null;
+        activeContext = null;
         HideOverlay();
         SetStatus("BlitzBrief bereit");
     }

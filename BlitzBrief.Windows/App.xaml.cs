@@ -45,13 +45,15 @@ public partial class App : System.Windows.Application
             AppLog.Write("OpenAIClient created.");
             var runner = new WorkflowRunner(openAIClient, apiKeyStore, () => settings);
             AppLog.Write("WorkflowRunner created.");
+            var cursorContextReader = new Platform.CursorContextReader(AppLog.Write);
 
             trayController = new TrayController(
                 settings,
                 settingsStore,
                 apiKeyStore,
                 runner,
-                realtimeTranscriber);
+                realtimeTranscriber,
+                cursorContextReader);
             AppLog.Write("TrayController created.");
             trayController.Start();
             AppLog.Write("TrayController started.");

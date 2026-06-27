@@ -188,6 +188,8 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <TextBlock Text="BlitzBrief" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
             <TextBox x:Name="TranscriptionHotkeyBox" Grid.Row="0" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
@@ -196,11 +198,17 @@
             <TextBlock Text="Text verbessern" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" />
             <TextBox x:Name="TextImproverHotkeyBox" Grid.Row="1" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
-            <TextBlock Text="&#x00C4;rger beruhigen" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="DampfHotkeyBox" Grid.Row="2" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
+            <TextBlock Text="Blitzbrief-Easy" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="BlitzBriefEasyHotkeyBox" Grid.Row="2" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
-            <TextBlock Text="Emoji erg&#x00E4;nzen" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="EmojiHotkeyBox" Grid.Row="3" Grid.Column="1" Margin="0,0,8,0" IsReadOnly="True"
+            <TextBlock Text="&#x00C4;rger beruhigen" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="DampfHotkeyBox" Grid.Row="3" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
+                     PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
+            <TextBlock Text="Emoji erg&#x00E4;nzen" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="EmojiHotkeyBox" Grid.Row="4" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
+                     PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
+            <TextBlock Text="Blitzbrief-Kontext" Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="KontextHotkeyBox" Grid.Row="5" Grid.Column="1" Margin="0,0,8,0" IsReadOnly="True"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
           </Grid>
           <TextBlock x:Name="HotkeyHelpText" Text="Mind. zwei Modifier-Tasten (Strg, Alt, Umschalt, Win) oder Modifier + weitere Taste." Style="{StaticResource Description}" Margin="0,8,0,0" />

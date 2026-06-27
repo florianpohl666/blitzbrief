@@ -40,7 +40,9 @@ public sealed class AppSettings
         [WorkflowType.Transcription] = "Ctrl+Shift+Space",
         [WorkflowType.TextImprover] = "Ctrl+Shift+1",
         [WorkflowType.DampfAblassen] = "Ctrl+Shift+2",
-        [WorkflowType.EmojiText] = "Ctrl+Shift+3"
+        [WorkflowType.EmojiText] = "Ctrl+Shift+3",
+        [WorkflowType.BlitzBriefEasy] = "Ctrl+Win",
+        [WorkflowType.BlitzBriefKontext] = "Ctrl+Shift+4"
     };
 }
 

@@ -1,4 +1,5 @@
 ﻿using BlitzBrief.Core;
+using BlitzBrief.Core.Models;
 using BlitzBrief.Core.Settings;
 
 namespace BlitzBrief.Tests;
@@ -6,6 +7,33 @@ namespace BlitzBrief.Tests;
 
 public sealed class PromptBuilderTests
 {
+    [Fact]
+    public void WorkflowWhisperPrompt_BlitzBriefKontext_AppendsPrecedingSentenceAtEnd()
+    {
+        var settings = new AppSettings();
+        var prompt = PromptBuilder.BuildWorkflowWhisperPrompt(
+            WorkflowType.BlitzBriefKontext, settings, hasEnoughAudio: true, "Das Gericht stellte fest, dass");
+
+        Assert.NotNull(prompt);
+        Assert.EndsWith("Das Gericht stellte fest, dass", prompt);
+    }
+
+    [Fact]
+    public void WorkflowWhisperPrompt_OmitsContext_WhenAudioTooShort()
+    {
+        var settings = new AppSettings();
+        var prompt = PromptBuilder.BuildWorkflowWhisperPrompt(
+            WorkflowType.BlitzBriefKontext, settings, hasEnoughAudio: false, "Das Gericht stellte fest, dass");
+
+        Assert.DoesNotContain("Das Gericht stellte fest", prompt ?? "");
+    }
+
+    [Fact]
+    public void UsesJornCommands_TrueForKontextMode()
+    {
+        Assert.True(PromptBuilder.UsesJornCommands(WorkflowType.BlitzBriefKontext, new AppSettings()));
+    }
+
     [Fact]
     public void TextImprovementPrompt_IncludesToneContextAndCustomTerms()
     {

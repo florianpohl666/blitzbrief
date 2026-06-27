@@ -59,6 +59,8 @@ DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
             DebugModeBox.IsChecked = settings.DebugMode;
             TranscriptionHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.Transcription];
             TextImproverHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.TextImprover];
+            BlitzBriefEasyHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.BlitzBriefEasy];
+            KontextHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.BlitzBriefKontext];
             DampfHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.DampfAblassen];
             EmojiHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.EmojiText];
             ToneBox.SelectedIndex = settings.TextImprovement.Tone switch
@@ -112,6 +114,8 @@ DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
             {
                 [WorkflowType.Transcription] = TranscriptionHotkeyBox.Text.Trim(),
                 [WorkflowType.TextImprover] = TextImproverHotkeyBox.Text.Trim(),
+                [WorkflowType.BlitzBriefEasy] = BlitzBriefEasyHotkeyBox.Text.Trim(),
+                [WorkflowType.BlitzBriefKontext] = KontextHotkeyBox.Text.Trim(),
                 [WorkflowType.DampfAblassen] = DampfHotkeyBox.Text.Trim(),
                 [WorkflowType.EmojiText] = EmojiHotkeyBox.Text.Trim()
             });
@@ -159,6 +163,8 @@ settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
             : 0;
         settings.WorkflowHotkeys[WorkflowType.Transcription] = TranscriptionHotkeyBox.Text.Trim();
         settings.WorkflowHotkeys[WorkflowType.TextImprover] = TextImproverHotkeyBox.Text.Trim();
+        settings.WorkflowHotkeys[WorkflowType.BlitzBriefEasy] = BlitzBriefEasyHotkeyBox.Text.Trim();
+        settings.WorkflowHotkeys[WorkflowType.BlitzBriefKontext] = KontextHotkeyBox.Text.Trim();
         settings.WorkflowHotkeys[WorkflowType.DampfAblassen] = DampfHotkeyBox.Text.Trim();
         settings.WorkflowHotkeys[WorkflowType.EmojiText] = EmojiHotkeyBox.Text.Trim();
         settings.TextImprovement.Tone = ToneBox.SelectedIndex switch
@@ -319,6 +325,8 @@ settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
         var defaults = AppSettings.DefaultHotkeys();
         TranscriptionHotkeyBox.Text = defaults[WorkflowType.Transcription];
         TextImproverHotkeyBox.Text = defaults[WorkflowType.TextImprover];
+        BlitzBriefEasyHotkeyBox.Text = defaults[WorkflowType.BlitzBriefEasy];
+        KontextHotkeyBox.Text = defaults[WorkflowType.BlitzBriefKontext];
         DampfHotkeyBox.Text = defaults[WorkflowType.DampfAblassen];
         EmojiHotkeyBox.Text = defaults[WorkflowType.EmojiText];
         HotkeyHelpText.Text = "Standard-Hotkeys wiederhergestellt.";
