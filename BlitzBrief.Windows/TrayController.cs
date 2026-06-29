@@ -19,6 +19,7 @@ public sealed class TrayController : IDisposable
     private readonly WorkflowRunner workflowRunner;
     private readonly IRealtimeTranscriber realtimeTranscriber;
     private readonly ICursorContextReader cursorContextReader;
+    private readonly SileroSpeechDetector speechDetector;
     private readonly Forms.NotifyIcon notifyIcon;
     private readonly HotkeyManager hotkeyManager = new();
     private readonly AudioRecorder audioRecorder = new();
@@ -40,7 +41,8 @@ public sealed class TrayController : IDisposable
         ApiKeyStore apiKeyStore,
         WorkflowRunner workflowRunner,
         IRealtimeTranscriber realtimeTranscriber,
-        ICursorContextReader cursorContextReader)
+        ICursorContextReader cursorContextReader,
+        SileroSpeechDetector speechDetector)
     {
         this.settings = settings;
         this.settingsStore = settingsStore;
@@ -48,6 +50,7 @@ public sealed class TrayController : IDisposable
         this.workflowRunner = workflowRunner;
         this.realtimeTranscriber = realtimeTranscriber;
         this.cursorContextReader = cursorContextReader;
+        this.speechDetector = speechDetector;
 
         notifyIcon = new Forms.NotifyIcon
         {
@@ -215,9 +218,58 @@ public sealed class TrayController : IDisposable
 
         var surroundings = cursorContextReader.Read();
         var sentence = SentenceContext.CurrentSentence(surroundings.Preceding);
-        AppLog.Write($"Kontext gelesen: links={(sentence is null ? "<null>" : $"\"{sentence}\"")} " +
-                     $"rechtsLänge={surroundings.Following?.Length ?? 0}");
+        AppLog.Write(
+            $"Kontext gelesen: linksRohLänge={LenOrNull(surroundings.Preceding)} " +
+            $"erkannterSatz={(sentence is null ? "<kein offener Satz → Großschreibung>" : $"\"{sentence}\"")} " +
+            $"rechtsLänge={LenOrNull(surroundings.Following)} rechtsVorschau={Preview(surroundings.Following)}");
         return surroundings;
+    }
+
+    // Schneidet im Kontext-Modus die führende Stille bis zum Sprachbeginn (Silero) ab und gibt das
+    // beschnittene PCM über <paramref name="trimmed"/> zurück. Liefert Diagnose fürs Debug-Fenster
+    // (null außerhalb des Kontext-Modus). Ist das Modell nicht verfügbar oder kein Onset erkannt,
+    // bleibt das PCM unverändert (Fallback: kein Trim).
+    private SpeechTrimInfo? TrimLeadingSilence(WorkflowType type, byte[] original, ref byte[] trimmed)
+    {
+        if (type != WorkflowType.BlitzBriefKontext)
+        {
+            return null;
+        }
+
+        if (!speechDetector.Available)
+        {
+            AppLog.Write("Trim(Silero): Modell nicht verfügbar → kein Trim");
+            return new SpeechTrimInfo(false, new SpeechOnset(false, 0, 0, SileroSpeechDetector.FrameMs, 0.5f, []), 0);
+        }
+
+        var onset = speechDetector.Detect(original, AudioRecorder.SampleRate);
+        var trimmedMs = 0;
+        if (onset.Detected && onset.OnsetMs > 0)
+        {
+            var cutBytes = (long)onset.OnsetMs * AudioRecorder.SampleRate / 1000 * 2;
+            if (cutBytes > 0 && cutBytes < original.Length)
+            {
+                trimmed = original[(int)cutBytes..];
+                trimmedMs = onset.OnsetMs;
+            }
+        }
+
+        var maxProb = onset.Probabilities.Count > 0 ? onset.Probabilities.Max() : 0f;
+        AppLog.Write($"Trim(Silero): onset={(onset.Detected ? onset.OnsetMs + "ms" : "keiner")} " +
+                     $"getrimmt={trimmedMs}ms fenster={onset.Probabilities.Count} maxProb={maxProb:F2}");
+        return new SpeechTrimInfo(true, onset, trimmedMs);
+    }
+
+    // "<null>" wenn gar nicht gelesen, sonst die Zeichenanzahl – unterscheidet "kein Textzugriff"
+    // von "gelesen, aber leer".
+    private static string LenOrNull(string? s) => s is null ? "<null>" : s.Length.ToString();
+
+    // Kurze, einzeilige Vorschau für die Log-Datei (keine Umbrüche, gekappt).
+    private static string Preview(string? s)
+    {
+        if (s is null) return "<null>";
+        var oneLine = s.ReplaceLineEndings(" ").Trim();
+        return oneLine.Length <= 40 ? $"\"{oneLine}\"" : $"\"{oneLine[..40]}…\"";
     }
 
     // Kontext-Modus: Diktat passend zur Einfügestelle formen (Leerzeichen links/rechts, Auto-Punkt
@@ -298,8 +350,13 @@ public sealed class TrayController : IDisposable
 
             string? realtimeTranscript = await FinishRealtimeAsync(session, recording.Duration, token);
 
+            // Kontext-Modus: führende Stille vor whisper-1 abschneiden (Silero-VAD). Nur das an
+            // whisper gesendete PCM wird beschnitten; die ORIGINAL-Dauer bleibt für alle Guards.
+            var pcm = recording.Pcm;
+            var trimInfo = TrimLeadingSilence(type, recording.Pcm, ref pcm);
+
             var audio = new RecordedAudio(
-                recording.Pcm,
+                pcm,
                 AudioRecorder.SampleRate,
                 recording.Duration,
                 realtimeTranscript,
@@ -323,8 +380,11 @@ public sealed class TrayController : IDisposable
                 var raw = result.RawTranscript ?? result.Stage1Transcript;
                 var s1 = result.Stage1Transcript;
                 var s2 = result.Text;
+                // surroundings + trimInfo sind nur im Kontext-Modus gesetzt → dort zeigt das Debug-
+                // Fenster zusätzlich den erkannten Cursor-Kontext und die Silero-Trim-Diagnose.
+                var trim = trimInfo;
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                    new DebugOutputWindow(raw, s1, s2).Show());
+                    new DebugOutputWindow(raw, s1, s2, surroundings, trim).Show());
             }
         }
         catch (OperationCanceledException)
@@ -517,6 +577,7 @@ public sealed class TrayController : IDisposable
         processingCts?.Cancel();
         AbortRealtimeSession();
         audioRecorder.Dispose();
+        speechDetector.Dispose();
         hotkeyManager.Dispose();
         overlayWindow?.Close();
         floatingToolbarWindow?.Close();

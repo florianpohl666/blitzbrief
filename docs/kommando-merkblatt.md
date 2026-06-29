@@ -1,6 +1,6 @@
 # BlitzBrief – Merkblatt (Kommandos & Do's/Don'ts)
 
-> **Stand:** 2026-06-27 · Generiert über `/doku-erstellen` · Eine Seite zum Ausdrucken
+> **Stand:** 2026-06-28 · Generiert über `/doku-erstellen` · Eine Seite zum Ausdrucken
 
 ## Diktierbefehle (Easy · Kontext · „Jörn 2")
 
@@ -28,14 +28,14 @@
 
 | Modus | Hotkey | Kommandos? | KI schreibt um? |
 |---|---|---|---|
-| BlitzBrief | Strg+Umschalt+Leer | ✗ | ✗ |
-| Text verbessern | Strg+Umschalt+1 | nur „Jörn 2" | ✓ (außer SkipRewrite) |
-| Ärger beruhigen | Strg+Umschalt+2 | ✗ | ✓ |
-| Emoji ergänzen | Strg+Umschalt+3 | ✗ | ✓ |
+| BlitzBrief | Strg+Alt+Leer | ✗ | ✗ |
+| Text verbessern | Strg+Alt+1 | nur „Jörn 2" | ✓ (außer SkipRewrite) |
+| Ärger beruhigen | Strg+Alt+2 | ✗ | ✓ |
+| Emoji ergänzen | Strg+Alt+3 | ✗ | ✓ |
 | Blitzbrief-Easy | Strg+Win | ✓ | ✗ |
-| Blitzbrief-Kontext | Strg+Umschalt+4 | ✓ | ✗ |
+| Blitzbrief-Kontext | Strg+Umschalt | ✓ | ✗ |
 
-*(Hotkeys sind Standardwerte und in den Einstellungen änderbar.)*
+*(Hotkeys sind Standardwerte und in den Einstellungen änderbar. Aufnahme-Modus standardmäßig „Halten".)*
 
 ---
 
@@ -43,7 +43,7 @@
 
 - **Kommandowörter deutlich und einzeln sprechen** („… Müller **Komma** wir …"), mit kleiner Pause davor/danach.
 - **Eigennamen/Fachbegriffe vorab eintragen** (Einstellungen → Eigenbegriffe), damit sie korrekt geschrieben werden.
-- **Kontext-Modus für Einschübe:** Cursor wirklich an die Stelle setzen, an der weitergeschrieben werden soll – BlitzBrief liest links *und* rechts und passt Groß-/Kleinschreibung, Leerzeichen und Schlusspunkt an.
+- **Kontext-Modus für Einschübe:** Cursor wirklich an die Stelle setzen, an der weitergeschrieben werden soll – BlitzBrief liest links *und* rechts und passt Groß-/Kleinschreibung, Leerzeichen und Schlusspunkt an. Beginnt dein Diktat mit `,` `:` `;` o. Ä., klebt es korrekt an (kein Leerzeichen davor); öffnende Anführungszeichen, `§` und Gedankenstrich bekommen automatisch ein Leerzeichen davor.
 - **Mindestens ~1 Sekunde sprechen** – sehr kurze Schnipsel werden zum Schutz vor Fehltranskriptionen teils verworfen.
 - **Richtigen Modus wählen:** wörtlich/juristisch → Easy/Kontext; Rohtext aufpolieren → Text verbessern.
 

@@ -10,8 +10,13 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.27.0" />
     <ProjectReference Include="..\BlitzBrief.Core\BlitzBrief.Core.csproj" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Silero VAD v5 (MIT-Lizenz), eingebettet und zur Laufzeit direkt aus byte[] geladen. -->
+    <EmbeddedResource Include="Assets\silero_vad.onnx" />
   </ItemGroup>
 </Project>

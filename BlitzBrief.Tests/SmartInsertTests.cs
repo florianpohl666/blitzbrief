@@ -27,6 +27,37 @@ public sealed class SmartInsertTests
         Assert.Equal("Text ", SmartInsert.Format("Text", preceding: "", following: null));
     }
 
+    // ── Führendes Leerzeichen abhängig vom ERSTEN Zeichen des Diktats ─────────
+    [Theory]
+    [InlineData(",", false)]   // Komma klebt nach links → kein Leerzeichen
+    [InlineData(":", false)]   // Doppelpunkt
+    [InlineData(";", false)]   // Semikolon
+    [InlineData(".", false)]   // Punkt
+    [InlineData("!", false)]   // Ausrufezeichen
+    [InlineData("?", false)]   // Fragezeichen
+    [InlineData(")", false)]   // schließende Klammer
+    [InlineData("”", false)]   // schließendes Anführungszeichen
+    [InlineData("„", true)]    // öffnendes Anführungszeichen → Leerzeichen
+    [InlineData("§", true)]    // Paragraphzeichen → Leerzeichen
+    [InlineData("–", true)]    // Gedankenstrich (kurz) → Leerzeichen
+    [InlineData("—", true)]    // Gedankenstrich (lang) → Leerzeichen
+    [InlineData("Wort", true)] // normaler Buchstabe → Leerzeichen
+    public void LeadingSpace_DependsOnFirstCharOfDictation(string dictation, bool expectsLeadingSpace)
+    {
+        // preceding endet auf Buchstaben (klebt links), following leer → isoliert den Diktat-Anfang.
+        var result = SmartInsert.Format(dictation, preceding: "Wort", following: null);
+        Assert.Equal(expectsLeadingSpace, result.StartsWith(' '));
+    }
+
+    [Fact]
+    public void LeadingComma_HugsPrecedingWord_MidSentence()
+    {
+        // Klassischer Einschub: ", dass" mitten im Satz darf nicht zu "festgestellt , dass" werden.
+        var result = SmartInsert.Format(", dass es regnet",
+            preceding: "Das Gericht hat festgestellt", following: " und nass ist.");
+        Assert.StartsWith(", dass", result);
+    }
+
     // ── Nachgestelltes Leerzeichen ───────────────────────────────────────────
     [Theory]
     [InlineData(null, true)]      // Feldende → Leerzeichen (Verkettung)

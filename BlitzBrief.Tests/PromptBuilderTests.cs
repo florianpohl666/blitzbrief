@@ -19,13 +19,21 @@ public sealed class PromptBuilderTests
     }
 
     [Fact]
-    public void WorkflowWhisperPrompt_OmitsContext_WhenAudioTooShort()
+    public void WorkflowWhisperPrompt_IncludesContextEvenWhenAudioShort_ButNotCommandHints()
     {
+        // Fix für die Großschreibung kurzer Einschübe: der Vortext muss AUCH bei kurzem Audio
+        // mit – sonst hat whisper-1 keinen Fortsetzungs-Kontext und schreibt das erste Wort groß.
         var settings = new AppSettings();
         var prompt = PromptBuilder.BuildWorkflowWhisperPrompt(
             WorkflowType.BlitzBriefKontext, settings, hasEnoughAudio: false, "Das Gericht stellte fest, dass");
 
-        Assert.DoesNotContain("Das Gericht stellte fest", prompt ?? "");
+        Assert.NotNull(prompt);
+        // Fragment wird angehängt …
+        Assert.EndsWith("Das Gericht stellte fest, dass", prompt);
+        // … hinter einem punkt-beendeten Satz (Sprachvorgabe als Anker), damit whisper klein fortsetzt …
+        Assert.Contains("auf Deutsch.", prompt);
+        // … aber die echo-anfälligen Kommando-Hinweise bleiben bei kurzem Audio weg.
+        Assert.DoesNotContain("Diktierbefehle", prompt);
     }
 
     [Fact]

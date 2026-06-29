@@ -1,6 +1,6 @@
 # BlitzBrief – Dokumentation
 
-> **Stand:** 2026-06-27 · Generiert über den Befehl `/doku-erstellen` (nur auf Zuruf, nicht pro Release).
+> **Stand:** 2026-06-28 · Generiert über den Befehl `/doku-erstellen` (nur auf Zuruf, nicht pro Release).
 
 | Dokument | Für wen | Inhalt |
 |---|---|---|

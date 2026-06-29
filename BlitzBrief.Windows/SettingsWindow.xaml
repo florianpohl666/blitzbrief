@@ -120,17 +120,21 @@
       <!-- Allgemein -->
       <Border Style="{StaticResource Panel}">
         <StackPanel>
-          <TextBlock Text="Allgemein" Style="{StaticResource SectionTitle}" />
+          <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Allgemein" Style="{StaticResource SectionTitle}" Grid.Column="0" VerticalAlignment="Center" Margin="0" />
+            <Button Grid.Column="1" Content="Zur&#x00FC;cksetzen" Click="ResetGeneral_Click" ToolTip="Allgemeine Einstellungen auf die Standardwerte zur&#x00FC;cksetzen" />
+          </Grid>
+
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="160" />
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
@@ -155,18 +159,53 @@
               <ComboBoxItem Content="Toggle" />
               <ComboBoxItem Content="Halten" />
             </ComboBox>
+          </Grid>
 
-            <CheckBox x:Name="AutoPasteBox" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
-                      Content="Nach Ergebnis automatisch mit Strg+V einf&#x00FC;gen"
-                      Margin="0,0,0,6" Checked="Setting_Changed" Unchecked="Setting_Changed" />
+          <CheckBox x:Name="AutoPasteBox"
+                    Content="Nach Ergebnis automatisch mit Strg+V einf&#x00FC;gen"
+                    Margin="0,0,0,8" Checked="Setting_Changed" Unchecked="Setting_Changed" />
 
-<TextBlock Text="Mikrofon" Grid.Row="5" Grid.Column="0" Style="{StaticResource RowLabel}" />
-            <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,6">
+          <CheckBox x:Name="RealtimeBox" Content="Echtzeit-Transkription (streamt w&#x00E4;hrend des Sprechens, geringere Latenz)"
+                    Margin="0,0,0,4" Checked="Setting_Changed" Unchecked="Setting_Changed" />
+          <TextBlock Text="Sendet das Audio live an OpenAI, statt erst nach dem Stopp hochzuladen. F&#x00E4;llt bei Verbindungsproblemen automatisch auf den klassischen Upload zur&#x00FC;ck. Nur f&#x00FC;r gpt-4o(-mini)-transcribe."
+                     Style="{StaticResource Description}" Margin="0,0,0,8" />
+
+          <CheckBox x:Name="DoubleTapEnabledBox" Content="Diktat per Doppeltipp starten/stoppen"
+                    Margin="0,0,0,8" Checked="Setting_Changed" Unchecked="Setting_Changed" />
+          <Grid Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="160" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Doppeltipp-Taste" Grid.Column="0" VerticalAlignment="Center" />
+            <ComboBox x:Name="DoubleTapModifierBox" Grid.Column="1" Width="120" HorizontalAlignment="Left" SelectionChanged="ComboBox_Changed">
+              <ComboBoxItem Content="Strg" />
+              <ComboBoxItem Content="Alt" />
+              <ComboBoxItem Content="Umschalt" />
+            </ComboBox>
+          </Grid>
+
+          <CheckBox x:Name="PreRollEnabledBox" Content="Mikrofon vorab aktiv halten (verz&#x00F6;gerungsfreier Start)"
+                    Margin="0,0,0,4" Checked="Setting_Changed" Unchecked="Setting_Changed" />
+          <TextBlock Text="Hinweis: Bei aktivem Pre-Roll ist das Mikrofon dauerhaft aktiv." Style="{StaticResource Description}" Margin="0,0,0,10" />
+
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="160" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Text="Mikrofon" Grid.Row="0" Grid.Column="0" Style="{StaticResource RowLabel}" />
+            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,6">
               <ComboBox x:Name="MicrophoneBox" DisplayMemberPath="Name" SelectedValuePath="Index" MinWidth="200" SelectionChanged="ComboBox_Changed" />
               <Button Content="&#x21BB;" Margin="8,0,0,0" Width="32" Padding="0" Click="CheckMicrophone_Click" ToolTip="Mikrofone neu laden" />
             </StackPanel>
 
-            <TextBlock x:Name="MicrophoneStatusText" Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2"
+            <TextBlock x:Name="MicrophoneStatusText" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
                        Text="Noch nicht gepr&#x00FC;ft." Foreground="{StaticResource TextMuted}" FontSize="11" />
           </Grid>
         </StackPanel>
@@ -195,51 +234,23 @@
             <TextBox x:Name="TranscriptionHotkeyBox" Grid.Row="0" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
             <Button Grid.Row="0" Grid.Column="2" Content="Zur&#x00FC;cksetzen" Margin="0,0,0,8" Click="ResetHotkeys_Click" />
-            <TextBlock Text="Text verbessern" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="TextImproverHotkeyBox" Grid.Row="1" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
+            <TextBlock Text="Blitzbrief-Easy" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="BlitzBriefEasyHotkeyBox" Grid.Row="1" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
-            <TextBlock Text="Blitzbrief-Easy" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="BlitzBriefEasyHotkeyBox" Grid.Row="2" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
+            <TextBlock Text="Blitzbrief-Kontext" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="KontextHotkeyBox" Grid.Row="2" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
-            <TextBlock Text="&#x00C4;rger beruhigen" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="DampfHotkeyBox" Grid.Row="3" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
+            <TextBlock Text="Text verbessern" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="TextImproverHotkeyBox" Grid.Row="3" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
-            <TextBlock Text="Emoji erg&#x00E4;nzen" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="EmojiHotkeyBox" Grid.Row="4" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
+            <TextBlock Text="&#x00C4;rger beruhigen" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="DampfHotkeyBox" Grid.Row="4" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
-            <TextBlock Text="Blitzbrief-Kontext" Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="KontextHotkeyBox" Grid.Row="5" Grid.Column="1" Margin="0,0,8,0" IsReadOnly="True"
+            <TextBlock Text="Emoji erg&#x00E4;nzen" Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="EmojiHotkeyBox" Grid.Row="5" Grid.Column="1" Margin="0,0,8,0" IsReadOnly="True"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
           </Grid>
           <TextBlock x:Name="HotkeyHelpText" Text="Mind. zwei Modifier-Tasten (Strg, Alt, Umschalt, Win) oder Modifier + weitere Taste." Style="{StaticResource Description}" Margin="0,8,0,0" />
-        </StackPanel>
-      </Border>
-
-      <!-- Schnellstart & Latenz -->
-      <Border Style="{StaticResource Panel}">
-        <StackPanel>
-          <TextBlock Text="Schnellstart &amp; Latenz" Style="{StaticResource SectionTitle}" />
-          <CheckBox x:Name="RealtimeBox" Content="Echtzeit-Transkription (streamt w&#x00E4;hrend des Sprechens, geringere Latenz)"
-                    Margin="0,0,0,8" Checked="Setting_Changed" Unchecked="Setting_Changed" />
-          <TextBlock Text="Sendet das Audio live an OpenAI, statt erst nach dem Stopp hochzuladen. F&#x00E4;llt bei Verbindungsproblemen automatisch auf den klassischen Upload zur&#x00FC;ck. Nur f&#x00FC;r gpt-4o(-mini)-transcribe."
-                     Style="{StaticResource Description}" Margin="0,0,0,8" />
-          <CheckBox x:Name="DoubleTapEnabledBox" Content="Diktat per Doppeltipp starten/stoppen"
-                    Margin="0,0,0,8" Checked="Setting_Changed" Unchecked="Setting_Changed" />
-          <Grid Margin="0,0,0,8">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="160" />
-              <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="Doppeltipp-Taste" Grid.Column="0" VerticalAlignment="Center" />
-            <ComboBox x:Name="DoubleTapModifierBox" Grid.Column="1" Width="120" HorizontalAlignment="Left" SelectionChanged="ComboBox_Changed">
-              <ComboBoxItem Content="Strg" />
-              <ComboBoxItem Content="Alt" />
-              <ComboBoxItem Content="Umschalt" />
-            </ComboBox>
-          </Grid>
-          <CheckBox x:Name="PreRollEnabledBox" Content="Mikrofon vorab aktiv halten (verz&#x00F6;gerungsfreier Start)"
-                    Checked="Setting_Changed" Unchecked="Setting_Changed" />
-          <TextBlock Text="Hinweis: Bei aktivem Pre-Roll ist das Mikrofon dauerhaft aktiv." Style="{StaticResource Description}" Margin="0,4,0,0" />
         </StackPanel>
       </Border>
 

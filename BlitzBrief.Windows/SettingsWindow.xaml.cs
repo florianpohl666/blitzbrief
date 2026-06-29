@@ -333,6 +333,30 @@ settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
         _ = AutoSave();
     }
 
+    private void ResetGeneral_Click(object sender, RoutedEventArgs e)
+    {
+        // Setzt nur die allgemeinen Einstellungen auf die Standardwerte. _loading unterdrückt
+        // die einzelnen Change-Events der Controls, danach speichern wir einmal gebündelt.
+        _loading = true;
+        try
+        {
+            LanguageBox.SelectedIndex = 0;                       // Deutsch
+            TranscriptionModelBox.Text = "gpt-4o-mini-transcribe";
+            HotkeyModeBox.SelectedIndex = 1;                     // Halten
+            AutoPasteBox.IsChecked = true;                       // Ergebnis automatisch einfügen
+            RealtimeBox.IsChecked = true;                        // Echtzeit-Transkription
+            DoubleTapEnabledBox.IsChecked = true;                // Diktat-Doppeltipp
+            PreRollEnabledBox.IsChecked = true;                  // Mikrofon aktiv halten
+        }
+        finally
+        {
+            _loading = false;
+        }
+
+        SaveStatusText.Text = "Allgemeine Einstellungen zurückgesetzt.";
+        _ = AutoSave();
+    }
+
     private void PasteApiKey_Click(object sender, RoutedEventArgs e)
     {
         try

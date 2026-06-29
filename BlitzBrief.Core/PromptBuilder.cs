@@ -92,12 +92,18 @@ public static class PromptBuilder
         var customTerms = hasEnoughAudio ? settings.CustomTerms : (IReadOnlyList<string>)[];
         var basePrompt = BuildWhisperPrompt(customTerms, useCommandHints, settings.Language);
 
-        // Vortext (angefangener Satz links vom Cursor) nur bei ausreichend Audio anhängen –
-        // sonst spiegelt das Modell ihn bei Stille zurück. whisper-1 wertet nur die letzten
-        // ~224 Tokens aus, daher der rohe Satz ans ENDE: so konditioniert er die Fortsetzung
-        // (Groß-/Kleinschreibung). Per Spike bestätigt – nur whisper-1 wirkt hier, siehe
-        // Memory kontext-mode-whisper1 bzw. WorkflowRunner.KontextTranscriptionModel.
-        if (hasEnoughAudio && !string.IsNullOrWhiteSpace(precedingSentence))
+        // Vortext (angefangener Satz links vom Cursor) ans ENDE hängen – auch bei KURZEM Audio.
+        // whisper-1 wertet nur die letzten ~224 Tokens aus, daher der rohe Satz ganz hinten: so
+        // konditioniert er die Fortsetzung (Groß-/Kleinschreibung). Wichtig: whisper-1 setzt nur
+        // dann klein fort, wenn vor dem offenen Fragment ein punkt-beendeter Satz steht – die
+        // Sprachvorgabe ("…auf Deutsch.") liefert genau diesen Anker (ein nacktes Fragment reicht
+        // nicht). Früher war dies an hasEnoughAudio gekoppelt (Echo-Sorge), wodurch kurze
+        // Einzelwörter OHNE Kontext großgeschrieben wurden. Per Spike widerlegt: whisper-1 echot
+        // das Fragment bei (fast) leerem Audio NICHT (liefert "" bzw. eine bekannte Floskel, die
+        // der Qualitäts-Schutz ohnehin verwirft) – Mitsenden ist also unbedenklich. Nur die
+        // echo-anfälligen Kommando-Hinweise/Eigenbegriffe bleiben an hasEnoughAudio gekoppelt
+        // (oben). Siehe Memory kontext-grossschreibung-bug bzw. kontext-mode-whisper1.
+        if (!string.IsNullOrWhiteSpace(precedingSentence))
         {
             var fragment = precedingSentence.Trim();
             return string.IsNullOrEmpty(basePrompt) ? fragment : basePrompt + " " + fragment;

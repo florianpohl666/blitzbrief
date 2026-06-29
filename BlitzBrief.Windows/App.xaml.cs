@@ -46,6 +46,9 @@ public partial class App : System.Windows.Application
             var runner = new WorkflowRunner(openAIClient, apiKeyStore, () => settings);
             AppLog.Write("WorkflowRunner created.");
             var cursorContextReader = new Platform.CursorContextReader(AppLog.Write);
+            // Silero-VAD beim Start laden + warmlaufen (lädt ONNX Runtime). Schlägt das fehl,
+            // ist der Detector "nicht verfügbar" und es wird einfach nicht getrimmt.
+            var speechDetector = new Platform.SileroSpeechDetector();
 
             trayController = new TrayController(
                 settings,
@@ -53,7 +56,8 @@ public partial class App : System.Windows.Application
                 apiKeyStore,
                 runner,
                 realtimeTranscriber,
-                cursorContextReader);
+                cursorContextReader,
+                speechDetector);
             AppLog.Write("TrayController created.");
             trayController.Start();
             AppLog.Write("TrayController started.");

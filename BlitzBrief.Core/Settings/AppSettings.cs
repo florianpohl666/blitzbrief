@@ -5,7 +5,7 @@ namespace BlitzBrief.Core.Settings;
 public sealed class AppSettings
 {
     public string Language { get; set; } = "de";
-    public HotkeyMode HotkeyMode { get; set; } = HotkeyMode.Toggle;
+    public HotkeyMode HotkeyMode { get; set; } = HotkeyMode.Hold;
     public Dictionary<WorkflowType, string> WorkflowHotkeys { get; set; } = DefaultHotkeys();
     public List<string> CustomTerms { get; set; } = [];
     public TextImprovementSettings TextImprovement { get; set; } = new();
@@ -37,12 +37,15 @@ public sealed class AppSettings
 
     public static Dictionary<WorkflowType, string> DefaultHotkeys() => new()
     {
-        [WorkflowType.Transcription] = "Ctrl+Shift+Space",
-        [WorkflowType.TextImprover] = "Ctrl+Shift+1",
-        [WorkflowType.DampfAblassen] = "Ctrl+Shift+2",
-        [WorkflowType.EmojiText] = "Ctrl+Shift+3",
+        // Easy/Kontext sind reine Modifier-Hotkeys (Ctrl+Win bzw. Ctrl+Shift). Damit Ctrl+Shift
+        // nicht bei jeder anderen Kombination mitfeuert, dürfen die übrigen Hotkeys NICHT auf
+        // Ctrl+Shift basieren – sie liegen daher auf Ctrl+Alt.
+        [WorkflowType.Transcription] = "Ctrl+Alt+Space",
         [WorkflowType.BlitzBriefEasy] = "Ctrl+Win",
-        [WorkflowType.BlitzBriefKontext] = "Ctrl+Shift+4"
+        [WorkflowType.BlitzBriefKontext] = "Ctrl+Shift",
+        [WorkflowType.TextImprover] = "Ctrl+Alt+1",
+        [WorkflowType.DampfAblassen] = "Ctrl+Alt+2",
+        [WorkflowType.EmojiText] = "Ctrl+Alt+3"
     };
 }
 

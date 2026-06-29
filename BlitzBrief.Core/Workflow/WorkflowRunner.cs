@@ -57,6 +57,8 @@ public sealed class WorkflowRunner(
         else
         {
             // Kontext-Modus: angefangener Satz links vom Cursor wird an den Prompt gehängt.
+            // Das führende-Stille-Trimmen (Silero) passiert im Windows-Projekt VOR dieser Stelle –
+            // hier kommt bereits beschnittenes PCM an.
             echoPrompt = PromptBuilder.BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio, audio.PrecedingContext);
             var rawText = await TranscribeBatchAsync(audio, apiKey, settings.Language, echoPrompt, model, cancellationToken);
             cleaned = TranscriptionQualityService.CleanedTranscript(rawText);
@@ -159,4 +161,7 @@ public sealed class WorkflowRunner(
     }
 }
 
-public sealed record WorkflowResult(string Text, string? Stage1Transcript = null, string? RawTranscript = null);
+public sealed record WorkflowResult(
+    string Text,
+    string? Stage1Transcript = null,
+    string? RawTranscript = null);

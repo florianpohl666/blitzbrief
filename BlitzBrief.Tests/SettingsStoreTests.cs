@@ -15,7 +15,7 @@ public sealed class SettingsStoreTests
 
         Assert.Equal("de", settings.Language);
         Assert.Equal("gpt-4o-mini-transcribe", settings.TranscriptionModel);
-        Assert.Equal("Ctrl+Shift+Space", settings.WorkflowHotkeys[WorkflowType.Transcription]);
+        Assert.Equal("Ctrl+Alt+Space", settings.WorkflowHotkeys[WorkflowType.Transcription]);
         Assert.Empty(settings.CustomTerms);
     }
 

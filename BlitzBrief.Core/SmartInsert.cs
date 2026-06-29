@@ -12,7 +12,9 @@ public static class SmartInsert
     // Zeichen, nach denen KEIN führendes Leerzeichen kommt (öffnende Klammern/Anführung, Slash).
     private const string Openers = "([{„«“‹/";
 
-    // Zeichen, vor denen KEIN nachgestelltes Leerzeichen kommt (schließende/anhängende Satzzeichen).
+    // Zeichen, die nach links kleben (schließende/anhängende Satzzeichen). Symmetrisch genutzt:
+    // rechts vom Cursor unterdrücken sie das nachgestellte Leerzeichen; als ERSTES Zeichen des
+    // Diktats unterdrücken sie das führende Leerzeichen (z.B. ",dass" statt "Wort , dass").
     private const string RightHuggers = ".,;:!?)]}»”›…";
 
     // Satzzeichen, die – direkt rechts vom Cursor – signalisieren, dass der Satz dort weiterläuft.
@@ -27,7 +29,7 @@ public static class SmartInsert
             text = StripTrailingAutoPeriod(text);
         }
 
-        if (NeedsLeadingSpace(preceding))
+        if (NeedsLeadingSpace(preceding) && !StartsWithRightHugger(text))
         {
             text = " " + text;
         }
@@ -93,6 +95,14 @@ public static class SmartInsert
         var c = preceding[^1];
         return !char.IsWhiteSpace(c) && Openers.IndexOf(c) < 0;
     }
+
+    /// <summary>
+    /// Beginnt das Diktat mit einem nach links klebenden Satzzeichen (Komma, Punkt, Doppelpunkt,
+    /// schließende Klammer/Anführung …)? Dann darf kein führendes Leerzeichen davor. Öffnende
+    /// Anführungszeichen, §, Gedankenstrich usw. zählen NICHT dazu und behalten ihr Leerzeichen.
+    /// </summary>
+    private static bool StartsWithRightHugger(string text) =>
+        !string.IsNullOrEmpty(text) && RightHuggers.IndexOf(text[0]) >= 0;
 
     private static bool NeedsTrailingSpace(string? following)
     {

@@ -1,6 +1,6 @@
 # BlitzBrief – Anwenderhandbuch
 
-> **Stand:** 2026-06-27 · Generiert über `/doku-erstellen`
+> **Stand:** 2026-06-28 · Generiert über `/doku-erstellen`
 
 BlitzBrief verwandelt gesprochenes Wort in Text – direkt dort, wo dein Cursor steht, in fast jeder Anwendung (Word, Outlook, Browser, Editor …). Du drückst einen Hotkey, sprichst, und der fertige Text erscheint an der Cursorposition.
 
@@ -26,14 +26,14 @@ flowchart LR
 
 Du kannst jeden Modus auf vier Wegen starten:
 
-- **Hotkey** (global, funktioniert in jeder App) – siehe Tabelle unten.
+- **Hotkey** (global, funktioniert in jeder App) – Standardbelegung siehe **Merkblatt**. Standard: BlitzBrief = Strg+Alt+Leer, Blitzbrief-Easy = Strg+Win, Blitzbrief-Kontext = Strg+Umschalt, Text verbessern/Ärger beruhigen/Emoji = Strg+Alt+1/2/3.
 - **Doppeltipp** auf einen Modifier (z. B. zweimal schnell Strg) – wie bei Wispr Flow.
 - **Floating-Toolbar** – die schwebende Leiste mit Buttons (Diktat, Verbessern, Easy, Kontext, Beruhigen).
 - **Tray-Menü** – Rechtsklick aufs BlitzBrief-Symbol unten rechts.
 
-**Zwei Aufnahme-Modi** (Einstellung „Hotkey-Modus"):
-- **Toggle:** einmal drücken startet, nochmal drücken stoppt.
-- **Hold:** gedrückt halten zum Sprechen, loslassen beendet.
+**Zwei Aufnahme-Modi** (Einstellung „Hotkey-Modus", Standard **Halten**):
+- **Halten (Hold):** gedrückt halten zum Sprechen, loslassen beendet.
+- **Umschalten (Toggle):** einmal drücken startet, nochmal drücken stoppt.
 
 > 💡 Die Toolbar „klaut" den Fokus nicht – dein Cursor bleibt im Zieltext, auch wenn du auf einen Button klickst.
 
@@ -89,7 +89,7 @@ flowchart TD
 
 Konkret erledigt der Modus automatisch:
 - **Richtige Groß-/Kleinschreibung:** Fortsetzung beginnt klein, wenn der Satz noch offen ist (Namen/Substantive bleiben groß).
-- **Leerzeichen:** setzt vorne/hinten ein Leerzeichen, wenn nötig – kein „Wortklebt" mehr.
+- **Leerzeichen mit Zeichengefühl:** setzt vorne/hinten ein Leerzeichen, wenn nötig – kein „Wortklebt" mehr. Beginnt dein Diktat mit einem anhängenden Satzzeichen (`,` `:` `;` `.` `!` `?` `)`), kommt **kein** Leerzeichen davor (`…festgestellt, dass` statt `…festgestellt , dass`). Beginnt es mit einem öffnenden Anführungszeichen, `§` oder Gedankenstrich (`–`/`—`), wird das Leerzeichen davor gesetzt.
 - **Kein doppelter Punkt:** wenn du mitten in einen Satz einfügst, lässt er den automatischen Schlusspunkt weg.
 
 > ⚠️ Funktioniert am besten in Apps mit guter Textunterstützung (Word, Outlook, Edge/Chrome, Editor). In Apps ohne Textzugriff verhält sich der Modus einfach wie Easy.
@@ -107,6 +107,7 @@ Konkret erledigt der Modus automatisch:
 - **Schnellstart/Latenz:** Pre-Roll (Mikro dauerhaft aktiv für sofortigen Start) und Echtzeit-Transkription.
 - **Eigenbegriffe:** Namen/Fachbegriffe, die korrekt geschrieben werden sollen.
 - **Auto-Einfügen:** Text automatisch per Strg+V einfügen (sonst nur in die Zwischenablage).
+- **Zurücksetzen:** „Allgemeine Einstellungen zurücksetzen" stellt Sprache, Modell, Hotkey-Modus, Auto-Einfügen, Echtzeit, Doppeltipp und Pre-Roll auf die Standardwerte zurück (Hotkey-Belegungen, Prompts und Eigenbegriffe bleiben unberührt).
 
 ---
 

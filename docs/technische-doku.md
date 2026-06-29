@@ -1,6 +1,6 @@
 # BlitzBrief – Technische Dokumentation
 
-> **Stand:** 2026-06-27 · Basis-Commit `64148c4` + Working-Tree (Blitzbrief-Kontext / SmartInsert)
+> **Stand:** 2026-06-28 · Basis-Commit `d0d6b47` + Working-Tree (Hotkey-Defaults, HotkeyMode=Hold, SmartInsert-Leerzeichenregel)
 > Generiert über `/doku-erstellen`. Bei Code-Änderungen neu generieren.
 
 BlitzBrief ist eine Windows-Diktier-App (.NET 10, WPF + WinForms-Tray). Per Hotkey/Doppeltipp wird Audio aufgenommen, über OpenAI transkribiert, je nach **Modus** nachverarbeitet und an der Cursorposition der aktiven Anwendung eingefügt.
@@ -148,12 +148,14 @@ flowchart TD
 
 | Modus | DisplayName | Default-Hotkey | Jörn-Kommandos | GPT-Rewrite | Transkriptionsmodell |
 |---|---|---|---|---|---|
-| `Transcription` | BlitzBrief | Strg+Umschalt+Leer | nein | nein | Einstellung (Realtime) |
-| `TextImprover` | Text verbessern | Strg+Umschalt+1 | nur bei Stil „Jörn 2" | ja (außer SkipRewrite) | Einstellung (Realtime) |
-| `DampfAblassen` | Ärger beruhigen | Strg+Umschalt+2 | nein | ja (gpt-4o) | Einstellung (Realtime) |
-| `EmojiText` | Emoji ergänzen | Strg+Umschalt+3 | nein | ja | Einstellung (Realtime) |
+| `Transcription` | BlitzBrief | Strg+Alt+Leer | nein | nein | Einstellung (Realtime) |
+| `TextImprover` | Text verbessern | Strg+Alt+1 | nur bei Stil „Jörn 2" | ja (außer SkipRewrite) | Einstellung (Realtime) |
+| `DampfAblassen` | Ärger beruhigen | Strg+Alt+2 | nein | ja (gpt-4o) | Einstellung (Realtime) |
+| `EmojiText` | Emoji ergänzen | Strg+Alt+3 | nein | ja | Einstellung (Realtime) |
 | `BlitzBriefEasy` | Blitzbrief-Easy | Strg+Win | **ja** | **nein** | Einstellung (Realtime) |
-| `BlitzBriefKontext` | Blitzbrief-Kontext | Strg+Umschalt+4 | **ja** | **nein** | **whisper-1 (Batch)** |
+| `BlitzBriefKontext` | Blitzbrief-Kontext | Strg+Umschalt | **ja** | **nein** | **whisper-1 (Batch)** |
+
+> Easy und Kontext sind **reine Modifier-Hotkeys** (Strg+Win bzw. Strg+Umschalt). Damit Strg+Umschalt nicht bei jeder anderen Kombination mitfeuert, liegen die übrigen Hotkeys bewusst auf **Strg+Alt** statt Strg+Umschalt.
 
 `UsesJornCommands` ist `true` für **Easy**, **Kontext** und **TextImprover mit Stil „Jörn 2"** (`TextTone.JornCommands`). Nur dann werden Kommando-Hinweise im Prompt gesendet **und** die Kommandoersetzung (§7) angewandt.
 
@@ -251,17 +253,22 @@ flowchart TD
     A[Diktat-Ergebnis] --> B{Satzeinschub?<br/>links offen UND rechts läuft<br/>klein/Satzzeichen weiter}
     B -->|ja| C[einzelnen End-Punkt entfernen<br/>… ... ? ! bleiben]
     B -->|nein| D[Punkt bleibt]
-    C --> E{Zeichen links<br/>kein Space/keine öffnende Klammer?}
+    C --> E{"Zeichen links klebt?<br/>kein Space/keine öffnende Klammer"}
     D --> E
-    E -->|ja| F[führendes Leerzeichen]
     E -->|nein| G[kein führendes]
-    F --> H{Zeichen rechts<br/>Buchstabe/Ziffer klebt?}
+    E -->|ja| E2{"Diktat beginnt mit<br/>klebendem Satzzeichen?<br/>, . ; : ! ? ) …"}
+    E2 -->|ja| G
+    E2 -->|nein| F[führendes Leerzeichen]
+    F --> H{"Zeichen rechts<br/>Buchstabe/Ziffer klebt?"}
     G --> H
     H -->|ja| I[nachgestelltes Leerzeichen]
     H -->|nein| J[kein nachgestelltes]
 ```
 
-- **Führendes Leerzeichen:** wenn links ein Buchstabe/Ziffer/schließendes Satzzeichen steht; **nicht** bei Whitespace/Zeilenanfang oder öffnender Klammer/Slash (`( [ { „ « / …`).
+- **Führendes Leerzeichen:** nur wenn **beide Seiten der Klebestelle kleben** wollen –
+  - *links:* es steht ein Buchstabe/Ziffer/schließendes Satzzeichen (also **nicht** Whitespace/Zeilenanfang oder öffnende Klammer/Slash `( [ { „ « / …`), **und**
+  - *rechts (= erstes Zeichen des Diktats):* es ist **kein** nach links klebendes Satzzeichen. Beginnt das Diktat mit einem solchen „Right-Hugger" (`. , ; : ! ? ) ] } » ” › …`), entfällt das Leerzeichen (z. B. `…festgestellt` + `, dass` → `…festgestellt, dass`, nicht `…festgestellt , dass`).
+  - Öffnende Anführungszeichen, `§` und Gedankenstrich (`–`/`—`) sind **keine** Right-Hugger und behalten ihr führendes Leerzeichen (z. B. `…Betrag` + `§ 5` → `…Betrag § 5`). Es ist dieselbe `RightHuggers`-Menge, die auch das nachgestellte Leerzeichen steuert – ein solches Zeichen klebt immer nach links, egal ob rechts vom Cursor oder am Diktat-Anfang.
 - **Nachgestelltes Leerzeichen:** wenn rechts direkt ein Buchstabe/Ziffer klebt; **nicht** bei vorhandenem Leerzeichen oder anhängendem Satzzeichen (`. , ; : ! ? ) …`); am Feldende immer (Verkettung).
 - **Auto-Punkt entfernen:** nur bei klarem Einschub (links offener Satz **und** rechts geht klein oder mit Satzzeichen weiter). Ellipse `…`/`...`, `?`, `!` bleiben erhalten.
 
@@ -275,4 +282,6 @@ flowchart TD
 
 ## 10. Einstellungen (`AppSettings`)
 
-Sprache, Hotkey-Modus (Toggle/Hold), Doppeltipp-Modifier, Pre-Roll, `UseRealtimeTranscription`, Transkriptions-/Rewrite-Modell, Eigenbegriffe, pro-Modus-Prompts/Stile, `AutoPaste`, Debug-Modus. Persistenz als JSON via `SettingsStore`; `Normalize` füllt fehlende Hotkeys aus den Defaults auf (so erhalten Bestands-Installationen neue Modi automatisch).
+Sprache, Hotkey-Modus (Toggle/Hold, **Default Hold**), Doppeltipp-Modifier, Pre-Roll, `UseRealtimeTranscription`, Transkriptions-/Rewrite-Modell, Eigenbegriffe, pro-Modus-Prompts/Stile, `AutoPaste`, Debug-Modus. Persistenz als JSON via `SettingsStore`; `Normalize` füllt fehlende Hotkeys aus den Defaults auf (so erhalten Bestands-Installationen neue Modi automatisch).
+
+In `SettingsWindow` setzt der Button **„Allgemeine Einstellungen zurücksetzen"** (`ResetGeneral_Click`) Sprache, Transkriptionsmodell, Hotkey-Modus (Halten), Auto-Einfügen, Echtzeit-Transkription, Doppeltipp und Pre-Roll gebündelt auf die Standardwerte (ohne Hotkey-Belegungen, Prompts oder Eigenbegriffe).
