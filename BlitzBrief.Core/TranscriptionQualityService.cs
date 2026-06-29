@@ -243,4 +243,88 @@ public static class TranscriptionQualityService
     private static string[] EchoTokens(string text) =>
         EchoNonWord.Replace(text.ToLowerInvariant(), " ")
             .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+    // gpt-4o-(mini-)transcribe kann beim beidseitigen Lücken-Prompt den Cursor-Kontext
+    // "durchsickern" lassen: das Modell schreibt linken/rechten Nachbartext mit aus statt
+    // nur das Diktat. Konservativ entfernen: nur eine zusammenhängende Kontext-Wortfolge
+    // (>= 2 Wörter) DIREKT an der jeweiligen Grenze – so wird echtes Diktat nie angetastet,
+    // auch wenn ein einzelnes diktiertes Wort zufällig einem Kontextwort gleicht.
+    public static string StripLeakedContext(string? output, string? leftContext, string? rightContext)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return output ?? "";
+        }
+
+        var outWords = output.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var norm = outWords.Select(NormToken).ToArray();
+        var leftN = LeakTokens(leftContext);
+        var rightN = LeakTokens(rightContext);
+
+        var lead = LeadingRun(norm, leftN);
+        var trail = TrailingRun(norm, lead, rightN);
+        if (lead == 0 && trail == 0)
+        {
+            return output.Trim();
+        }
+
+        var keep = outWords.Length - lead - trail;
+        if (keep <= 0)
+        {
+            // Ausgabe wäre komplett Kontext → nichts zerstören, Original zurückgeben.
+            return output.Trim();
+        }
+
+        return string.Join(" ", outWords.Skip(lead).Take(keep)).Trim();
+    }
+
+    // Längster Lauf p >= 2, sodass die ersten p Ausgabe-Wörter dem ENDE des Kontexts entsprechen.
+    private static int LeadingRun(string[] output, string[] ctx)
+    {
+        for (var p = Math.Min(output.Length, ctx.Length); p >= 2; p--)
+        {
+            if (SeqEqual(output, 0, ctx, ctx.Length - p, p))
+            {
+                return p;
+            }
+        }
+        return 0;
+    }
+
+    // Längster Lauf q >= 2, sodass die letzten q Ausgabe-Wörter dem ANFANG des Kontexts entsprechen
+    // (ohne in die bereits am Anfang entfernten <paramref name="lead"/> Wörter zu greifen).
+    private static int TrailingRun(string[] output, int lead, string[] ctx)
+    {
+        for (var q = Math.Min(output.Length - lead, ctx.Length); q >= 2; q--)
+        {
+            if (SeqEqual(output, output.Length - q, ctx, 0, q))
+            {
+                return q;
+            }
+        }
+        return 0;
+    }
+
+    private static bool SeqEqual(string[] a, int ai, string[] b, int bi, int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            if (!string.Equals(a[ai + i], b[bi + i], StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static string[] LeakTokens(string? text) =>
+        string.IsNullOrWhiteSpace(text)
+            ? []
+            : text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                .Select(NormToken)
+                .Where(t => t.Length > 0)
+                .ToArray();
+
+    private static string NormToken(string word) =>
+        new string(word.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 }

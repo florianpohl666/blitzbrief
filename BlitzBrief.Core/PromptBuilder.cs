@@ -113,12 +113,43 @@ public static class PromptBuilder
     }
 
     /// <summary>
+    /// Baut den Transkriptions-Prompt für „Blitzbrief-Kontext (GPT)": die üblichen Hinweise
+    /// (Sprache, Eigenbegriffe, Jörn-/Juristik-Kommandos) plus – getrennt davon – die
+    /// Cursor-Nachbarschaft mit einer Einfügelücke. So sieht das instruktionsfähige
+    /// gpt-4o-(mini-)transcribe, wohin das Diktat gehört (links/rechts vom Cursor).
+    /// </summary>
+    public static string? BuildKontextGapPrompt(
+        WorkflowType type, AppSettings settings, bool hasEnoughAudio, string? left, string? right)
+    {
+        var useCommandHints = UsesJornCommands(type, settings) && hasEnoughAudio;
+        var customTerms = hasEnoughAudio ? settings.CustomTerms : (IReadOnlyList<string>)[];
+        var hints = BuildWhisperPrompt(customTerms, useCommandHints, settings.Language);
+
+        var l = (left ?? "").Trim();
+        var r = (right ?? "").Trim();
+
+        // Ohne jeden Kontext gibt es nichts einzufügen → wie eine normale Transkription primen.
+        if (l.Length == 0 && r.Length == 0)
+        {
+            return hints;
+        }
+
+        var gap =
+            "An der mit ___ markierten Stelle wird gesprochener Text in einen bestehenden Text eingefügt:\n" +
+            $"\"{l} ___ {r}\"\n" +
+            "Transkribiere ausschließlich die Audioaufnahme – den Text, der an die Stelle ___ gehört – " +
+            "wortgetreu auf Deutsch. Gib nur diesen eingefügten Text aus, nicht den umgebenden Kontext.";
+
+        return string.IsNullOrEmpty(hints) ? gap : hints + "\n\n" + gap;
+    }
+
+    /// <summary>
     /// Trifft die Jörn-2-Verarbeitung zu (juristischer Kommando-Prompt beim Transkribieren
     /// und anschließende Kommandoersetzung)? Gilt für "Text verbessern" mit Stil "Jörn 2" und
-    /// für die fest verdrahteten Modi "Blitzbrief-Easy" und "Blitzbrief-Kontext".
+    /// für die fest verdrahteten Kontext-Modi.
     /// </summary>
     public static bool UsesJornCommands(WorkflowType type, AppSettings settings) =>
-        type is WorkflowType.BlitzBriefEasy or WorkflowType.BlitzBriefKontext ||
+        type is WorkflowType.BlitzBriefEasy or WorkflowType.BlitzBriefKontext or WorkflowType.BlitzBriefKontextGpt ||
         (type == WorkflowType.TextImprover && settings.TextImprovement.Tone == TextTone.JornCommands);
 
     private static string? LanguageDirectiveName(string language) => language.Trim().ToLowerInvariant() switch

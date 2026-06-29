@@ -20,9 +20,14 @@ public sealed class WorkflowRunner(
     // whisper-1 ist batch-only; der Realtime-Pfad wird dafür automatisch übersprungen.
     public const string KontextTranscriptionModel = "whisper-1";
 
-    /// <summary>Transkriptionsmodell für den Workflow – whisper-1 nur im Kontext-Modus, sonst die Einstellung.</summary>
-    public static string TranscriptionModelFor(WorkflowType type, AppSettings settings) =>
-        type == WorkflowType.BlitzBriefKontext ? KontextTranscriptionModel : settings.TranscriptionModel;
+    /// <summary>Transkriptionsmodell für den Workflow – whisper-1 im Kontext-Modus, das eingestellte
+    /// gpt-4o-(mini-)transcribe im Kontext-GPT-Modus, sonst die allgemeine Einstellung.</summary>
+    public static string TranscriptionModelFor(WorkflowType type, AppSettings settings) => type switch
+    {
+        WorkflowType.BlitzBriefKontext => KontextTranscriptionModel,
+        WorkflowType.BlitzBriefKontextGpt => settings.KontextGptModel,
+        _ => settings.TranscriptionModel
+    };
 
     public async Task<WorkflowResult> ProcessAsync(
         WorkflowType type,
@@ -47,21 +52,39 @@ public sealed class WorkflowRunner(
 
         // Transkript besorgen: bevorzugt aus dem Realtime-Stream, sonst per Batch-Upload.
         // echoPrompt = der Prompt, mit dem das aktuelle Transkript entstanden ist (für die Echo-Prüfung).
+        // usedRealtime = kam das finale Transkript aus dem Realtime-Stream (für die Debug-Anzeige).
+        var usedRealtime = audio.RealtimeTranscript is not null;
         string cleaned;
         string? echoPrompt;
         if (audio.RealtimeTranscript is not null)
         {
             cleaned = TranscriptionQualityService.CleanedTranscript(audio.RealtimeTranscript);
             echoPrompt = audio.RealtimePrompt;
+
+            // Kontext-GPT auch im Realtime-Pfad gegen Leakage des Lücken-Kontexts absichern.
+            if (type == WorkflowType.BlitzBriefKontextGpt)
+            {
+                cleaned = TranscriptionQualityService.StripLeakedContext(cleaned, audio.PrecedingContext, audio.FollowingContext);
+            }
         }
         else
         {
             // Kontext-Modus: angefangener Satz links vom Cursor wird an den Prompt gehängt.
-            // Das führende-Stille-Trimmen (Silero) passiert im Windows-Projekt VOR dieser Stelle –
-            // hier kommt bereits beschnittenes PCM an.
-            echoPrompt = PromptBuilder.BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio, audio.PrecedingContext);
+            // Kontext-GPT-Modus: stattdessen Kontext LINKS UND RECHTS mit Einfügelücke (gpt-4o-transcribe
+            // versteht die Beschreibung). Das führende-Stille-Trimmen (Silero) passiert im Windows-Projekt
+            // VOR dieser Stelle – hier kommt bereits beschnittenes PCM an.
+            echoPrompt = type == WorkflowType.BlitzBriefKontextGpt
+                ? PromptBuilder.BuildKontextGapPrompt(type, settings, hasEnoughAudio, audio.PrecedingContext, audio.FollowingContext)
+                : PromptBuilder.BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio, audio.PrecedingContext);
             var rawText = await TranscribeBatchAsync(audio, apiKey, settings.Language, echoPrompt, model, cancellationToken);
             cleaned = TranscriptionQualityService.CleanedTranscript(rawText);
+
+            // Kontext-GPT: falls das Modell den mitgegebenen Cursor-Kontext mitgeschrieben hat
+            // (Leakage), die durchgesickerten Nachbarwörter an den Rändern entfernen.
+            if (type == WorkflowType.BlitzBriefKontextGpt)
+            {
+                cleaned = TranscriptionQualityService.StripLeakedContext(cleaned, audio.PrecedingContext, audio.FollowingContext);
+            }
         }
 
         // Der Prompt (Eigenbegriffe/Kommando-Hinweise) kann kurze Einzelwörter verbiegen,
@@ -73,6 +96,7 @@ public sealed class WorkflowRunner(
         {
             var retryText = await TranscribeBatchAsync(audio, apiKey, settings.Language, null, model, cancellationToken);
             cleaned = TranscriptionQualityService.CleanedTranscript(retryText);
+            usedRealtime = false; // finales Transkript kam aus dem Batch-Retry, nicht aus Realtime
         }
 
         // Nach dem Retry kann kein Prompt-Echo mehr vorliegen (kein Prompt gesendet);
@@ -94,7 +118,7 @@ public sealed class WorkflowRunner(
 
         if (type == WorkflowType.Transcription)
         {
-            return new WorkflowResult(cleaned);
+            return new WorkflowResult(cleaned, UsedRealtime: usedRealtime);
         }
 
         var stage1 = useCommandHints
@@ -105,8 +129,8 @@ public sealed class WorkflowRunner(
         var rewritten = type switch
         {
             // Fest verdrahtet: Transkription + Jörn-2-Kommandoersetzung (in stage1), ohne GPT-Rewrite.
-            // Kontext-Modus zusätzlich mit Vortext im whisper-1-Prompt (oben), Nachverarbeitung identisch.
-            WorkflowType.BlitzBriefEasy or WorkflowType.BlitzBriefKontext => stage1,
+            // Kontext-Modi zusätzlich mit Cursor-Kontext im Prompt (oben), Nachverarbeitung identisch.
+            WorkflowType.BlitzBriefEasy or WorkflowType.BlitzBriefKontext or WorkflowType.BlitzBriefKontextGpt => stage1,
             WorkflowType.TextImprover when settings.TextImprovement.SkipRewrite => stage1,
             WorkflowType.TextImprover => await RewriteAsync(
                 stage1,
@@ -132,7 +156,7 @@ public sealed class WorkflowRunner(
             _ => stage1
         };
 
-        return new WorkflowResult(rewritten, Stage1Transcript: stage1, RawTranscript: cleaned);
+        return new WorkflowResult(rewritten, Stage1Transcript: stage1, RawTranscript: cleaned, UsedRealtime: usedRealtime);
     }
 
     private async Task<string> TranscribeBatchAsync(
@@ -164,4 +188,5 @@ public sealed class WorkflowRunner(
 public sealed record WorkflowResult(
     string Text,
     string? Stage1Transcript = null,
-    string? RawTranscript = null);
+    string? RawTranscript = null,
+    bool UsedRealtime = false);

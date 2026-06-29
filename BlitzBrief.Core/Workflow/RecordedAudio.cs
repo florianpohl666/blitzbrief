@@ -11,4 +11,5 @@ public sealed record RecordedAudio(
     TimeSpan Duration,
     string? RealtimeTranscript = null,
     string? RealtimePrompt = null,
-    string? PrecedingContext = null);
+    string? PrecedingContext = null,
+    string? FollowingContext = null);

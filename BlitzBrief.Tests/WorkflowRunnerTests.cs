@@ -82,6 +82,56 @@ public sealed class WorkflowRunnerTests
     }
 
     [Fact]
+    public async Task ProcessAsync_BlitzBriefKontextGpt_UsesMini_BuildsGapPrompt_AndSkipsRewrite()
+    {
+        // Kontext-GPT: gpt-4o-mini-transcribe als Modell, Lücken-Prompt mit Kontext links UND rechts,
+        // Jörn-2 wie Easy, kein Rewrite.
+        var client = new FakeOpenAIClient("ganz", "SHOULD-NOT-REWRITE");
+        var runner = CreateRunner(client, out _);
+
+        var audio = new RecordedAudio([1, 2, 3, 4], 24000, TimeSpan.FromSeconds(2),
+            PrecedingContext: "Ich bin ein", FollowingContext: "alter Mann.");
+        var result = await runner.ProcessAsync(WorkflowType.BlitzBriefKontextGpt, audio, CancellationToken.None);
+
+        Assert.Equal("gpt-4o-mini-transcribe", client.LastModel);                          // settings.KontextGptModel
+        Assert.Contains("Ich bin ein ___ alter Mann.", client.LastTranscribePrompt);       // beidseitiger Lücken-Prompt
+        Assert.Equal("ganz", result.Text);                                                 // Diktat unverändert
+        Assert.Equal("", client.LastRewritePrompt);                                        // kein GPT-Rewrite
+    }
+
+    [Fact]
+    public async Task ProcessAsync_BlitzBriefKontextGpt_RealtimePath_StripsLeak_AndMarksRealtime()
+    {
+        // Realtime lieferte das Diktat inkl. mitgeschriebenem Rechtskontext -> Leakage-Strip greift
+        // auch im Realtime-Zweig; Ergebnis ist als Realtime markiert, ohne Batch-Upload.
+        var client = new FakeOpenAIClient("SHOULD-NOT-BE-USED", "unused");
+        var runner = CreateRunner(client, out _);
+
+        var audio = new RecordedAudio([1, 2, 3, 4], 24000, TimeSpan.FromSeconds(2),
+            RealtimeTranscript: "ganz alter Mann", RealtimePrompt: "Lücken-Prompt",
+            PrecedingContext: "Ich bin ein", FollowingContext: "alter Mann.");
+        var result = await runner.ProcessAsync(WorkflowType.BlitzBriefKontextGpt, audio, CancellationToken.None);
+
+        Assert.Equal("ganz", result.Text);
+        Assert.True(result.UsedRealtime);
+        Assert.False(client.Transcribed); // kein Batch-Upload nötig
+    }
+
+    [Fact]
+    public async Task ProcessAsync_BlitzBriefKontextGpt_StripsLeakedRightContext()
+    {
+        // Modell schreibt den rechten Cursor-Kontext mit (Leakage) -> Runner schneidet ihn ab.
+        var client = new FakeOpenAIClient("ganz alter Mann", "unused");
+        var runner = CreateRunner(client, out _);
+
+        var audio = new RecordedAudio([1, 2, 3, 4], 24000, TimeSpan.FromSeconds(2),
+            PrecedingContext: "Ich bin ein", FollowingContext: "alter Mann.");
+        var result = await runner.ProcessAsync(WorkflowType.BlitzBriefKontextGpt, audio, CancellationToken.None);
+
+        Assert.Equal("ganz", result.Text);
+    }
+
+    [Fact]
     public async Task ProcessAsync_BlitzBriefEasy_UsesConfiguredModel_NotWhisper1()
     {
         // Easy bleibt beim eingestellten Modell (Default gpt-4o-mini-transcribe), nicht whisper-1.

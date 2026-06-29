@@ -1,8 +1,8 @@
 # BlitzBrief – Merkblatt (Kommandos & Do's/Don'ts)
 
-> **Stand:** 2026-06-28 · Generiert über `/doku-erstellen` · Eine Seite zum Ausdrucken
+> **Stand:** 2026-06-29 · Generiert über `/doku-erstellen` · Eine Seite zum Ausdrucken
 
-## Diktierbefehle (Easy · Kontext · „Jörn 2")
+## Diktierbefehle (Easy · Kontext · Kontext (GPT) · „Jörn 2")
 
 | Sprich … | … erscheint als |
 |---|---|
@@ -34,8 +34,11 @@
 | Emoji ergänzen | Strg+Alt+3 | ✗ | ✓ |
 | Blitzbrief-Easy | Strg+Win | ✓ | ✗ |
 | Blitzbrief-Kontext | Strg+Umschalt | ✓ | ✗ |
+| Blitzbrief-Kontext (GPT) | Strg+Leer | ✓ | ✗ |
 
 *(Hotkeys sind Standardwerte und in den Einstellungen änderbar. Aufnahme-Modus standardmäßig „Halten".)*
+
+**Kontext vs. Kontext (GPT):** beide fügen mitten in den Satz ein. „Kontext" nutzt whisper-1 (Upload, sehr stabile Klein-Fortsetzung); „Kontext (GPT)" nutzt gpt-4o-transcribe mit Kontext links **und** rechts und streamt live (geringere Latenz). Für korrekte Groß-/Kleinschreibung im GPT-Modus das Modell auf **gpt-4o-transcribe** stellen.
 
 ---
 
@@ -44,13 +47,14 @@
 - **Kommandowörter deutlich und einzeln sprechen** („… Müller **Komma** wir …"), mit kleiner Pause davor/danach.
 - **Eigennamen/Fachbegriffe vorab eintragen** (Einstellungen → Eigenbegriffe), damit sie korrekt geschrieben werden.
 - **Kontext-Modus für Einschübe:** Cursor wirklich an die Stelle setzen, an der weitergeschrieben werden soll – BlitzBrief liest links *und* rechts und passt Groß-/Kleinschreibung, Leerzeichen und Schlusspunkt an. Beginnt dein Diktat mit `,` `:` `;` o. Ä., klebt es korrekt an (kein Leerzeichen davor); öffnende Anführungszeichen, `§` und Gedankenstrich bekommen automatisch ein Leerzeichen davor.
+- **Im GPT-Kontext-Modus das große Modell wählen** (gpt-4o-transcribe), wenn dir die korrekte Groß-/Kleinschreibung wichtig ist.
 - **Mindestens ~1 Sekunde sprechen** – sehr kurze Schnipsel werden zum Schutz vor Fehltranskriptionen teils verworfen.
 - **Richtigen Modus wählen:** wörtlich/juristisch → Easy/Kontext; Rohtext aufpolieren → Text verbessern.
 
 ## ❌ Don'ts
 
 - **Kein** Kommando-Diktat im reinen **BlitzBrief**-Modus erwarten – dort wird „Komma" als Wort geschrieben.
-- **Nicht** im Easy/Kontext/„Jörn 2" auf Umformulierung hoffen – diese Modi bereinigen nur, sie schreiben **nicht** um.
+- **Nicht** in Easy/Kontext/Kontext (GPT)/„Jörn 2" auf Umformulierung hoffen – diese Modi bereinigen nur, sie schreiben **nicht** um.
 - **Nicht** den Kontext-Modus für komplett neue Absätze nutzen – seine Stärke ist das **Fortsetzen** eines angefangenen Satzes.
 - **Nicht** mitten im Satz etwas diktieren, das selbst auf eine Abkürzung mit Punkt endet (z. B. „… z. B.") – der Schlusspunkt würde im Kontext-Modus mit entfernt.
 - **Nicht** erwarten, dass der Kontext-Modus in jeder App den Satz liest – Apps ohne Textzugriff fallen auf Easy-Verhalten zurück.
@@ -62,13 +66,15 @@
 
 ```mermaid
 flowchart TD
-    A[Was willst du?] --> B{Soll die KI<br/>umformulieren?}
-    B -->|Nein, wörtlich| C{Mitten in einen<br/>Satz einfügen?}
-    C -->|ja| D[Blitzbrief-Kontext]
+    A[Was willst du?] --> B{"Soll die KI<br/>umformulieren?"}
+    B -->|Nein, wörtlich| C{"Mitten in einen<br/>Satz einfügen?"}
+    C -->|ja| C2{"Lücken-Kontext<br/>+ geringe Latenz?"}
+    C2 -->|ja| D2["Blitzbrief-Kontext (GPT)"]
+    C2 -->|nein, max. stabil| D[Blitzbrief-Kontext]
     C -->|nein| E[Blitzbrief-Easy]
     B -->|Ja| F{Welches Ziel?}
     F -->|Sauberer Text| G[Text verbessern]
-    F -->|Wütend → sachlich| H[Ärger beruhigen]
+    F -->|"Wütend → sachlich"| H[Ärger beruhigen]
     F -->|Emojis rein| I[Emoji ergänzen]
     B -->|Nur 1:1 Diktat| J[BlitzBrief]
 ```

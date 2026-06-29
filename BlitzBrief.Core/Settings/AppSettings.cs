@@ -12,6 +12,9 @@ public sealed class AppSettings
     public DampfAblassenSettings DampfAblassen { get; set; } = new();
     public EmojiTextSettings EmojiText { get; set; } = new();
     public string TranscriptionModel { get; set; } = "gpt-4o-mini-transcribe";
+
+    /// <summary>Transkriptionsmodell für den Modus „Blitzbrief-Kontext (GPT)" (gpt-4o-mini-transcribe oder gpt-4o-transcribe).</summary>
+    public string KontextGptModel { get; set; } = "gpt-4o-mini-transcribe";
     public string RewriteModel { get; set; } = "gpt-4o-mini";
     public int AudioInputDeviceNumber { get; set; } = 0;
     public bool AutoPaste { get; set; } = true;
@@ -43,6 +46,7 @@ public sealed class AppSettings
         [WorkflowType.Transcription] = "Ctrl+Alt+Space",
         [WorkflowType.BlitzBriefEasy] = "Ctrl+Win",
         [WorkflowType.BlitzBriefKontext] = "Ctrl+Shift",
+        [WorkflowType.BlitzBriefKontextGpt] = "Ctrl+Space",
         [WorkflowType.TextImprover] = "Ctrl+Alt+1",
         [WorkflowType.DampfAblassen] = "Ctrl+Alt+2",
         [WorkflowType.EmojiText] = "Ctrl+Alt+3"

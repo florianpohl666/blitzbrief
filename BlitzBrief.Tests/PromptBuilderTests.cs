@@ -19,6 +19,30 @@ public sealed class PromptBuilderTests
     }
 
     [Fact]
+    public void KontextGapPrompt_PlacesGapBetweenLeftAndRight_AndKeepsCommandHints()
+    {
+        var settings = new AppSettings();
+        var prompt = PromptBuilder.BuildKontextGapPrompt(
+            WorkflowType.BlitzBriefKontextGpt, settings, hasEnoughAudio: true, "Ich bin ein", "alter Mann.");
+
+        Assert.NotNull(prompt);
+        Assert.Contains("\"Ich bin ein ___ alter Mann.\"", prompt);     // Lücke zwischen links und rechts
+        Assert.Contains("nur diesen eingefügten Text", prompt);          // Anti-Leakage-Anweisung
+        Assert.Contains("Diktierbefehle", prompt);                       // Jörn-/Juristik-Hinweise bleiben (getrennt)
+    }
+
+    [Fact]
+    public void KontextGapPrompt_WithoutAnyContext_FallsBackToHintsOnly()
+    {
+        var settings = new AppSettings();
+        var prompt = PromptBuilder.BuildKontextGapPrompt(
+            WorkflowType.BlitzBriefKontextGpt, settings, hasEnoughAudio: true, null, null);
+
+        Assert.NotNull(prompt);
+        Assert.DoesNotContain("___", prompt);                            // ohne Kontext keine Einfügelücke
+    }
+
+    [Fact]
     public void WorkflowWhisperPrompt_IncludesContextEvenWhenAudioShort_ButNotCommandHints()
     {
         // Fix für die Großschreibung kurzer Einschübe: der Vortext muss AUCH bei kurzem Audio

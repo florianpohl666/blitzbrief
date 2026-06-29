@@ -45,6 +45,7 @@ public partial class SettingsWindow : Window
                 _ => 0
             };
             TranscriptionModelBox.Text = settings.TranscriptionModel;
+            KontextGptModelBox.Text = settings.KontextGptModel;
             HotkeyModeBox.SelectedIndex = settings.HotkeyMode == HotkeyMode.Hold ? 1 : 0;
             AutoPasteBox.IsChecked = settings.AutoPaste;
 DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
@@ -61,6 +62,7 @@ DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
             TextImproverHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.TextImprover];
             BlitzBriefEasyHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.BlitzBriefEasy];
             KontextHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.BlitzBriefKontext];
+            KontextGptHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.BlitzBriefKontextGpt];
             DampfHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.DampfAblassen];
             EmojiHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.EmojiText];
             ToneBox.SelectedIndex = settings.TextImprovement.Tone switch
@@ -116,6 +118,7 @@ DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
                 [WorkflowType.TextImprover] = TextImproverHotkeyBox.Text.Trim(),
                 [WorkflowType.BlitzBriefEasy] = BlitzBriefEasyHotkeyBox.Text.Trim(),
                 [WorkflowType.BlitzBriefKontext] = KontextHotkeyBox.Text.Trim(),
+                [WorkflowType.BlitzBriefKontextGpt] = KontextGptHotkeyBox.Text.Trim(),
                 [WorkflowType.DampfAblassen] = DampfHotkeyBox.Text.Trim(),
                 [WorkflowType.EmojiText] = EmojiHotkeyBox.Text.Trim()
             });
@@ -144,9 +147,8 @@ DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
             2 => "",
             _ => "de"
         };
-        settings.TranscriptionModel = string.IsNullOrWhiteSpace(TranscriptionModelBox.Text)
-            ? "gpt-4o-mini-transcribe"
-            : TranscriptionModelBox.Text.Trim();
+        settings.TranscriptionModel = ModelFromCombo(TranscriptionModelBox, "gpt-4o-mini-transcribe");
+        settings.KontextGptModel = ModelFromCombo(KontextGptModelBox, "gpt-4o-mini-transcribe");
         settings.HotkeyMode = HotkeyModeBox.SelectedIndex == 1 ? HotkeyMode.Hold : HotkeyMode.Toggle;
         settings.AutoPaste = AutoPasteBox.IsChecked == true;
 settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
@@ -165,6 +167,7 @@ settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
         settings.WorkflowHotkeys[WorkflowType.TextImprover] = TextImproverHotkeyBox.Text.Trim();
         settings.WorkflowHotkeys[WorkflowType.BlitzBriefEasy] = BlitzBriefEasyHotkeyBox.Text.Trim();
         settings.WorkflowHotkeys[WorkflowType.BlitzBriefKontext] = KontextHotkeyBox.Text.Trim();
+        settings.WorkflowHotkeys[WorkflowType.BlitzBriefKontextGpt] = KontextGptHotkeyBox.Text.Trim();
         settings.WorkflowHotkeys[WorkflowType.DampfAblassen] = DampfHotkeyBox.Text.Trim();
         settings.WorkflowHotkeys[WorkflowType.EmojiText] = EmojiHotkeyBox.Text.Trim();
         settings.TextImprovement.Tone = ToneBox.SelectedIndex switch
@@ -327,6 +330,7 @@ settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
         TextImproverHotkeyBox.Text = defaults[WorkflowType.TextImprover];
         BlitzBriefEasyHotkeyBox.Text = defaults[WorkflowType.BlitzBriefEasy];
         KontextHotkeyBox.Text = defaults[WorkflowType.BlitzBriefKontext];
+        KontextGptHotkeyBox.Text = defaults[WorkflowType.BlitzBriefKontextGpt];
         DampfHotkeyBox.Text = defaults[WorkflowType.DampfAblassen];
         EmojiHotkeyBox.Text = defaults[WorkflowType.EmojiText];
         HotkeyHelpText.Text = "Standard-Hotkeys wiederhergestellt.";
@@ -404,6 +408,20 @@ settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
         apiKeyStore.Delete();
         LoadValues();
         SaveStatusText.Text = "API Key gelöscht.";
+    }
+
+    // Editierbare ComboBox robust auslesen: beim Auswählen liefert .Text während des
+    // SelectionChanged teils noch den alten oder einen leeren Wert (WPF-Eigenheit). Der
+    // ausgewählte Eintrag ist zuverlässig; nur bei frei getipptem Wert greift .Text.
+    private static string ModelFromCombo(System.Windows.Controls.ComboBox box, string fallback)
+    {
+        var value = (box.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            value = box.Text;
+        }
+
+        return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
     }
 
     private static string? ValidateHotkeys(Dictionary<WorkflowType, string> hotkeys)

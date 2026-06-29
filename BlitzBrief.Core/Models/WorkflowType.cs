@@ -19,7 +19,15 @@ public enum WorkflowType
     /// fortsetzt (Groß-/Kleinschreibung). Transkribiert deshalb per Batch mit whisper-1 –
     /// nur dieses Modell setzt Sätze grammatisch korrekt fort (siehe WorkflowRunner).
     /// </summary>
-    BlitzBriefKontext
+    BlitzBriefKontext,
+
+    /// <summary>
+    /// Wie <see cref="BlitzBriefKontext"/>, aber mit gpt-4o-(mini-)transcribe statt whisper-1.
+    /// Statt nur des linken Vortexts wird der Kontext LINKS UND RECHTS vom Cursor mit einer
+    /// Einfügelücke ("… ___ …") mitgegeben, damit das Modell das eingefügte Wort an der Stelle
+    /// versteht. Experimenteller Vergleichsmodus zu <see cref="BlitzBriefKontext"/>.
+    /// </summary>
+    BlitzBriefKontextGpt
 }
 
 public static class WorkflowTypeExtensions
@@ -32,6 +40,7 @@ public static class WorkflowTypeExtensions
         WorkflowType.EmojiText => "Emoji ergänzen",
         WorkflowType.BlitzBriefEasy => "Blitzbrief-Easy",
         WorkflowType.BlitzBriefKontext => "Blitzbrief-Kontext",
+        WorkflowType.BlitzBriefKontextGpt => "Blitzbrief-Kontext (GPT)",
         _ => "BlitzBrief"
     };
 }

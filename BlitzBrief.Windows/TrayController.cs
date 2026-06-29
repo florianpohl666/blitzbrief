@@ -102,6 +102,7 @@ public sealed class TrayController : IDisposable
         menu.Items.Add("Text verbessern", null, (_, _) => ToggleWorkflow(WorkflowType.TextImprover));
         menu.Items.Add("Blitzbrief-Easy", null, (_, _) => ToggleWorkflow(WorkflowType.BlitzBriefEasy));
         menu.Items.Add("Blitzbrief-Kontext", null, (_, _) => ToggleWorkflow(WorkflowType.BlitzBriefKontext));
+        menu.Items.Add("Blitzbrief-Kontext (GPT)", null, (_, _) => ToggleWorkflow(WorkflowType.BlitzBriefKontextGpt));
         menu.Items.Add("Ärger beruhigen", null, (_, _) => ToggleWorkflow(WorkflowType.DampfAblassen));
         menu.Items.Add("Emoji ergänzen", null, (_, _) => ToggleWorkflow(WorkflowType.EmojiText));
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -183,15 +184,16 @@ public sealed class TrayController : IDisposable
             processingCts?.Cancel();
             processingCts = new CancellationTokenSource();
 
+            // Kontext-Modi: Text rund um den Cursor lesen, solange der Fokus noch in der Zielapp liegt
+            // (Overlay/Toolbar sind WS_EX_NOACTIVATE) – und VOR dem Öffnen der Realtime-Session, weil
+            // deren Lücken-Prompt (Kontext-GPT) bei der Session-Erstellung feststehen muss. Der
+            // durchlaufende Pre-Roll-Puffer überbrückt die kurze Lesezeit, daher kein Audioverlust.
+            activeSurroundings = CaptureSurroundings(type);
+            activeContext = activeSurroundings is null ? null : SentenceContext.CurrentSentence(activeSurroundings.Preceding);
+
             // Realtime-Session VOR dem Scharfschalten öffnen, damit der Pre-Roll-Block live mitgesendet wird.
             StartRealtimeSession(type);
             audioRecorder.Arm();
-
-            // Kontext-Modus: Text rund um den Cursor lesen, solange der Fokus noch in der Zielapp
-            // liegt (Overlay/Toolbar sind WS_EX_NOACTIVATE). Nach dem Armen, damit währenddessen
-            // gesprochenes Audio in den Pre-Roll/Recorder läuft und nicht verloren geht.
-            activeSurroundings = CaptureSurroundings(type);
-            activeContext = activeSurroundings is null ? null : SentenceContext.CurrentSentence(activeSurroundings.Preceding);
 
             activeWorkflow = type;
             SetStatus($"{type.DisplayName()}: Aufnahme läuft");
@@ -208,10 +210,15 @@ public sealed class TrayController : IDisposable
         }
     }
 
+    // Beide Kontext-Modi (whisper-1 und GPT) lesen den Text rund um den Cursor und schneiden
+    // die führende Stille per Silero, fügen über SmartInsert ein. Alle übrigen Modi nicht.
+    private static bool IsKontextMode(WorkflowType type) =>
+        type is WorkflowType.BlitzBriefKontext or WorkflowType.BlitzBriefKontextGpt;
+
     // Liest im Kontext-Modus den Text rund um den Cursor; sonst kein Kontext.
     private CursorSurroundings? CaptureSurroundings(WorkflowType type)
     {
-        if (type != WorkflowType.BlitzBriefKontext)
+        if (!IsKontextMode(type))
         {
             return null;
         }
@@ -231,7 +238,7 @@ public sealed class TrayController : IDisposable
     // bleibt das PCM unverändert (Fallback: kein Trim).
     private SpeechTrimInfo? TrimLeadingSilence(WorkflowType type, byte[] original, ref byte[] trimmed)
     {
-        if (type != WorkflowType.BlitzBriefKontext)
+        if (!IsKontextMode(type))
         {
             return null;
         }
@@ -276,7 +283,7 @@ public sealed class TrayController : IDisposable
     // bei Satzeinschub entfernen). Andere Modi: bisheriges Verhalten – immer ein Leerzeichen anhängen.
     private static string ComposeInsertText(WorkflowType type, string text, CursorSurroundings? surroundings)
     {
-        if (type == WorkflowType.BlitzBriefKontext && surroundings is not null)
+        if (IsKontextMode(type) && surroundings is not null)
         {
             return SmartInsert.Format(text, surroundings.Preceding, surroundings.Following);
         }
@@ -290,6 +297,7 @@ public sealed class TrayController : IDisposable
         activeSessionPrompt = null;
 
         // Kontext-Modus läuft auf whisper-1 (batch-only) → IsRealtimeModel ist false → kein Realtime.
+        // Kontext-GPT läuft auf gpt-4o-transcribe (realtime-fähig) → nutzt unten den Lücken-Prompt.
         var model = WorkflowRunner.TranscriptionModelFor(type, settings);
         if (!settings.UseRealtimeTranscription || !IsRealtimeModel(model))
         {
@@ -304,13 +312,16 @@ public sealed class TrayController : IDisposable
 
         try
         {
-            // Dauer beim Start unbekannt -> hasEnoughAudio: true; das Echo bei sehr kurzem
-            // Audio fängt der Retry-Pfad im WorkflowRunner ab.
-            var prompt = PromptBuilder.BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio: true);
+            // Dauer beim Start unbekannt -> hasEnoughAudio: true; das Echo bei sehr kurzem Audio fängt
+            // der Retry-Pfad im WorkflowRunner ab. Kontext-GPT bekommt den beidseitigen Lücken-Prompt
+            // (Kontext wurde zuvor in StartRecording gelesen), sonst den Standard-Prompt.
+            var prompt = type == WorkflowType.BlitzBriefKontextGpt
+                ? PromptBuilder.BuildKontextGapPrompt(type, settings, hasEnoughAudio: true, activeContext, activeSurroundings?.Following)
+                : PromptBuilder.BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio: true);
             activeSession = realtimeTranscriber.CreateSession(
                 apiKey, model, settings.Language, prompt, AudioRecorder.SampleRate);
             activeSessionPrompt = prompt;
-            AppLog.Write($"Realtime session created model={model}");
+            AppLog.Write($"Realtime session created model={model} type={type}");
         }
         catch (Exception ex)
         {
@@ -361,7 +372,8 @@ public sealed class TrayController : IDisposable
                 recording.Duration,
                 realtimeTranscript,
                 sessionPrompt,
-                context);
+                context,
+                surroundings?.Following);
 
             var result = await workflowRunner.ProcessAsync(type, audio, token);
             AppLog.Write($"StopAndProcess result chars={result.Text.Length} totalMs={totalStopwatch.ElapsedMilliseconds} realtime={(realtimeTranscript is not null)} preview={result.Text[..Math.Min(60, result.Text.Length)]}");
@@ -384,7 +396,7 @@ public sealed class TrayController : IDisposable
                 // Fenster zusätzlich den erkannten Cursor-Kontext und die Silero-Trim-Diagnose.
                 var trim = trimInfo;
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                    new DebugOutputWindow(raw, s1, s2, surroundings, trim).Show());
+                    new DebugOutputWindow(raw, s1, s2, surroundings, trim, result.UsedRealtime).Show());
             }
         }
         catch (OperationCanceledException)

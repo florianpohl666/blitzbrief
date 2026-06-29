@@ -138,6 +138,7 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock Text="Sprache" Grid.Row="0" Grid.Column="0" Style="{StaticResource RowLabel}" />
@@ -158,6 +159,12 @@
             <ComboBox x:Name="HotkeyModeBox" Grid.Row="2" Grid.Column="1" Width="120" HorizontalAlignment="Left" Margin="0,0,0,10" SelectionChanged="ComboBox_Changed">
               <ComboBoxItem Content="Toggle" />
               <ComboBoxItem Content="Halten" />
+            </ComboBox>
+
+            <TextBlock Text="Kontext-GPT Modell" Grid.Row="3" Grid.Column="0" Style="{StaticResource RowLabel}" />
+            <ComboBox x:Name="KontextGptModelBox" Grid.Row="3" Grid.Column="1" Width="230" HorizontalAlignment="Left" IsEditable="True" Margin="0,0,0,8" SelectionChanged="ComboBox_Changed">
+              <ComboBoxItem Content="gpt-4o-mini-transcribe" />
+              <ComboBoxItem Content="gpt-4o-transcribe" />
             </ComboBox>
           </Grid>
 
@@ -229,6 +236,7 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <TextBlock Text="BlitzBrief" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
             <TextBox x:Name="TranscriptionHotkeyBox" Grid.Row="0" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
@@ -247,7 +255,10 @@
             <TextBox x:Name="DampfHotkeyBox" Grid.Row="4" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
             <TextBlock Text="Emoji erg&#x00E4;nzen" Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" />
-            <TextBox x:Name="EmojiHotkeyBox" Grid.Row="5" Grid.Column="1" Margin="0,0,8,0" IsReadOnly="True"
+            <TextBox x:Name="EmojiHotkeyBox" Grid.Row="5" Grid.Column="1" Margin="0,0,8,8" IsReadOnly="True"
+                     PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
+            <TextBlock Text="Blitzbrief-Kontext (GPT)" Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBox x:Name="KontextGptHotkeyBox" Grid.Row="6" Grid.Column="1" Margin="0,0,8,0" IsReadOnly="True"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" PreviewKeyUp="HotkeyBox_PreviewKeyUp" GotKeyboardFocus="HotkeyBox_GotKeyboardFocus" />
           </Grid>
           <TextBlock x:Name="HotkeyHelpText" Text="Mind. zwei Modifier-Tasten (Strg, Alt, Umschalt, Win) oder Modifier + weitere Taste." Style="{StaticResource Description}" Margin="0,8,0,0" />

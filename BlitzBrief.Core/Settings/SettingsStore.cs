@@ -60,6 +60,9 @@ public sealed class SettingsStore(string? settingsPath = null)
         settings.TranscriptionModel = string.IsNullOrWhiteSpace(settings.TranscriptionModel)
             ? "gpt-4o-mini-transcribe"
             : settings.TranscriptionModel.Trim();
+        settings.KontextGptModel = string.IsNullOrWhiteSpace(settings.KontextGptModel)
+            ? "gpt-4o-mini-transcribe"
+            : settings.KontextGptModel.Trim();
         settings.RewriteModel = string.IsNullOrWhiteSpace(settings.RewriteModel)
             ? "gpt-4o-mini"
             : settings.RewriteModel.Trim();

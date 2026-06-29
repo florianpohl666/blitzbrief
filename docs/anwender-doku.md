@@ -1,6 +1,6 @@
 # BlitzBrief – Anwenderhandbuch
 
-> **Stand:** 2026-06-28 · Generiert über `/doku-erstellen`
+> **Stand:** 2026-06-29 · Generiert über `/doku-erstellen`
 
 BlitzBrief verwandelt gesprochenes Wort in Text – direkt dort, wo dein Cursor steht, in fast jeder Anwendung (Word, Outlook, Browser, Editor …). Du drückst einen Hotkey, sprichst, und der fertige Text erscheint an der Cursorposition.
 
@@ -26,9 +26,9 @@ flowchart LR
 
 Du kannst jeden Modus auf vier Wegen starten:
 
-- **Hotkey** (global, funktioniert in jeder App) – Standardbelegung siehe **Merkblatt**. Standard: BlitzBrief = Strg+Alt+Leer, Blitzbrief-Easy = Strg+Win, Blitzbrief-Kontext = Strg+Umschalt, Text verbessern/Ärger beruhigen/Emoji = Strg+Alt+1/2/3.
+- **Hotkey** (global, funktioniert in jeder App) – Standardbelegung siehe **Merkblatt**. Standard: BlitzBrief = Strg+Alt+Leer, Blitzbrief-Easy = Strg+Win, Blitzbrief-Kontext = Strg+Umschalt, Blitzbrief-Kontext (GPT) = Strg+Leer, Text verbessern/Ärger beruhigen/Emoji = Strg+Alt+1/2/3.
 - **Doppeltipp** auf einen Modifier (z. B. zweimal schnell Strg) – wie bei Wispr Flow.
-- **Floating-Toolbar** – die schwebende Leiste mit Buttons (Diktat, Verbessern, Easy, Kontext, Beruhigen).
+- **Floating-Toolbar** – die schwebende Leiste mit Buttons.
 - **Tray-Menü** – Rechtsklick aufs BlitzBrief-Symbol unten rechts.
 
 **Zwei Aufnahme-Modi** (Einstellung „Hotkey-Modus", Standard **Halten**):
@@ -46,7 +46,8 @@ Du kannst jeden Modus auf vier Wegen starten:
 | **BlitzBrief** | Reine Transkription, 1:1 | Schnelles Diktat ohne Schnickschnack |
 | **Text verbessern** | Transkription + KI-Überarbeitung (Stil wählbar) | Aus gesprochenem Rohtext sauberen Text machen |
 | **Blitzbrief-Easy** | Diktat mit Kommandos (Komma, Satzende …), **ohne** KI-Umschreiben | Wörtliches Diktat mit Satzzeichen-Steuerung, v. a. juristische Texte |
-| **Blitzbrief-Kontext** | Wie Easy, **setzt aber den angefangenen Satz fort** | Mitten in einen Satz hinein weiterdiktieren |
+| **Blitzbrief-Kontext** | Wie Easy, **setzt aber den angefangenen Satz fort** (whisper-1) | Mitten in einen Satz hinein weiterdiktieren |
+| **Blitzbrief-Kontext (GPT)** | Wie Kontext, aber mit gpt-4o-transcribe und Kontext **links + rechts** | Einschübe, bei denen das Modell die Einfügestelle „verstehen" soll; geringere Latenz dank Echtzeit |
 | **Ärger beruhigen** | Formuliert eine emotionale Nachricht sachlich/lösungsorientiert um | Wütende E-Mail entschärfen |
 | **Emoji ergänzen** | Behält den Text, streut passende Emojis ein | Lockere Nachrichten aufpeppen |
 
@@ -58,7 +59,7 @@ Du kannst jeden Modus auf vier Wegen starten:
 
 ---
 
-## 4. Diktieren mit Kommandos (Easy, Kontext, „Jörn 2")
+## 4. Diktieren mit Kommandos (Easy, Kontext, Kontext (GPT), „Jörn 2")
 
 In diesen Modi sprichst du Satzzeichen und Layout einfach mit:
 
@@ -75,9 +76,9 @@ Zusätzlich werden Zeichen automatisch gesetzt, sobald eine Zahl folgt: „Parag
 
 ---
 
-## 5. Blitzbrief-Kontext genauer
+## 5. Die Kontext-Modi genauer (Weiterdiktieren mitten im Satz)
 
-Der besondere Modus für **Weiterdiktieren mitten im Satz**. BlitzBrief liest (zerstörungsfrei, ohne deine Zwischenablage anzufassen) den angefangenen Satz **links** und den Text **rechts** vom Cursor und sorgt dafür, dass deine Fortsetzung nahtlos passt:
+Beide Kontext-Modi lesen (zerstörungsfrei, ohne deine Zwischenablage anzufassen) den angefangenen Satz **links** und den Text **rechts** vom Cursor und sorgen dafür, dass deine Fortsetzung nahtlos passt:
 
 ```mermaid
 flowchart TD
@@ -87,12 +88,20 @@ flowchart TD
     D --> E[klein weiter, Leerzeichen korrekt, kein doppelter Punkt]
 ```
 
-Konkret erledigt der Modus automatisch:
+Beide Modi erledigen automatisch:
 - **Richtige Groß-/Kleinschreibung:** Fortsetzung beginnt klein, wenn der Satz noch offen ist (Namen/Substantive bleiben groß).
-- **Leerzeichen mit Zeichengefühl:** setzt vorne/hinten ein Leerzeichen, wenn nötig – kein „Wortklebt" mehr. Beginnt dein Diktat mit einem anhängenden Satzzeichen (`,` `:` `;` `.` `!` `?` `)`), kommt **kein** Leerzeichen davor (`…festgestellt, dass` statt `…festgestellt , dass`). Beginnt es mit einem öffnenden Anführungszeichen, `§` oder Gedankenstrich (`–`/`—`), wird das Leerzeichen davor gesetzt.
-- **Kein doppelter Punkt:** wenn du mitten in einen Satz einfügst, lässt er den automatischen Schlusspunkt weg.
+- **Leerzeichen mit Zeichengefühl:** setzt vorne/hinten ein Leerzeichen, wenn nötig. Beginnt dein Diktat mit einem anhängenden Satzzeichen (`,` `:` `;` `.` `!` `?` `)`), kommt **kein** Leerzeichen davor (`…festgestellt, dass` statt `…festgestellt , dass`). Bei öffnendem Anführungszeichen, `§` oder Gedankenstrich wird das Leerzeichen davor gesetzt.
+- **Kein doppelter Punkt:** beim Einfügen mitten in einen Satz entfällt der automatische Schlusspunkt.
+- **Führende Stille wird abgeschnitten** (Silero), damit dein Wortanlaut sauber ankommt.
 
-> ⚠️ Funktioniert am besten in Apps mit guter Textunterstützung (Word, Outlook, Edge/Chrome, Editor). In Apps ohne Textzugriff verhält sich der Modus einfach wie Easy.
+### Welcher der beiden?
+
+- **Blitzbrief-Kontext** (Strg+Umschalt): nutzt **whisper-1**. Sehr zuverlässige Klein-Fortsetzung, läuft per Upload nach dem Stopp.
+- **Blitzbrief-Kontext (GPT)** (Strg+Leer): nutzt **gpt-4o-transcribe** und gibt dem Modell den Kontext links **und** rechts mit. Streamt live (geringere Latenz). Welches Modell genutzt wird, stellst du in den Einstellungen unter **„Kontext-GPT Modell"** ein – für korrekte Groß-/Kleinschreibung wird **`gpt-4o-transcribe`** empfohlen (das kleinere `gpt-4o-mini-transcribe` schreibt eingefügte Einzelwörter oft groß).
+
+> ℹ️ Im Debug-Fenster zeigt ein Lämpchen oben, ob die Echtzeit-Transkription genutzt wurde (grün) oder auf den klassischen Upload zurückgefallen ist (grau).
+
+> ⚠️ Funktioniert am besten in Apps mit guter Textunterstützung (Word, Outlook, Edge/Chrome, Editor). In Apps ohne Textzugriff verhält sich der Modus wie Easy.
 
 ---
 
@@ -100,6 +109,7 @@ Konkret erledigt der Modus automatisch:
 
 - **OpenAI API Key:** lokal & verschlüsselt; einfügen/speichern/löschen.
 - **Sprache:** Deutsch, Englisch oder automatisch.
+- **Transkriptionsmodell** und **Kontext-GPT Modell** (für „Blitzbrief-Kontext (GPT)").
 - **Hotkeys:** pro Modus frei belegbar (ins Feld klicken, Kombination drücken; mind. zwei Modifier oder Modifier + Taste).
 - **Hotkey-Modus:** Toggle oder Hold.
 - **Doppeltipp:** an/aus + Modifier (Strg/Alt/Umschalt).
@@ -115,5 +125,6 @@ Konkret erledigt der Modus automatisch:
 
 - **Kein Text eingefügt?** API-Key gesetzt? Mikrofon korrekt gewählt? Aufnahme evtl. zu kurz (< 0,35 s wird ignoriert).
 - **Falsche Schreibweise von Namen?** Begriff unter „Eigenbegriffe" eintragen.
+- **„Kontext (GPT)" schreibt Einzelwörter groß?** In den Einstellungen das Kontext-GPT-Modell auf **`gpt-4o-transcribe`** stellen.
 - **Kontext-Fortsetzung klappt nicht?** Die App braucht Textzugriff auf die Zielanwendung; in manchen Apps ist das nicht möglich – dort wirkt der Modus wie Easy.
-- **Kommandowort erscheint als Wort statt als Zeichen?** Nur Easy/Kontext/„Jörn 2" setzen Kommandos um – im reinen „BlitzBrief"-Modus nicht.
+- **Kommandowort erscheint als Wort statt als Zeichen?** Nur Easy/Kontext/Kontext (GPT)/„Jörn 2" setzen Kommandos um – im reinen „BlitzBrief"-Modus nicht.
