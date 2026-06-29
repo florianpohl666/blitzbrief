@@ -384,8 +384,9 @@ public sealed class TrayController : IDisposable
                 await clipboardPasteService.PasteAsync(token);
             }
 
+            var elapsedMs = totalStopwatch.ElapsedMilliseconds; // ab Hotkey-Loslassen bis zum Einfügen
             HideOverlay();
-            SetStatus($"{type.DisplayName()}: fertig ({totalStopwatch.ElapsedMilliseconds} ms)");
+            SetStatus($"{type.DisplayName()}: fertig ({elapsedMs} ms)");
 
             if (settings.DebugMode && result.Stage1Transcript is not null)
             {
@@ -396,7 +397,7 @@ public sealed class TrayController : IDisposable
                 // Fenster zusätzlich den erkannten Cursor-Kontext und die Silero-Trim-Diagnose.
                 var trim = trimInfo;
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                    new DebugOutputWindow(raw, s1, s2, surroundings, trim, result.UsedRealtime).Show());
+                    new DebugOutputWindow(raw, s1, s2, surroundings, trim, result.UsedRealtime, elapsedMs).Show());
             }
         }
         catch (OperationCanceledException)

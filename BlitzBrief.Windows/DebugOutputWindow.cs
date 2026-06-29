@@ -18,9 +18,11 @@ public sealed class DebugOutputWindow : Window
     /// <param name="surroundings">Cursor-Kontext (nur Kontext-Modus) – Text links/rechts vom Cursor.</param>
     /// <param name="trim">Silero-Trim-Diagnose (nur Kontext-Modus) – Onset, getrimmte ms, Wahrscheinlichkeits-Verlauf.</param>
     /// <param name="usedRealtime">Kam das finale Transkript aus dem Realtime-Stream (true) oder per Batch (false)?</param>
+    /// <param name="elapsedMs">Dauer ab Hotkey-Loslassen bis zum Einfügen der Modellantwort (ms).</param>
     public DebugOutputWindow(
         string rawTranscript, string stage1, string stage2,
-        CursorSurroundings? surroundings = null, SpeechTrimInfo? trim = null, bool usedRealtime = false)
+        CursorSurroundings? surroundings = null, SpeechTrimInfo? trim = null,
+        bool usedRealtime = false, long elapsedMs = 0)
     {
         Title = "BlitzBrief – Debug";
         Width = 760;
@@ -123,7 +125,7 @@ public sealed class DebugOutputWindow : Window
 
         // Oben ein kleines Quelle-Lämpchen: Realtime (grün) vs. Batch (grau).
         var root = new DockPanel();
-        var badge = MakeSourceBadge(usedRealtime);
+        var badge = MakeSourceBadge(usedRealtime, elapsedMs);
         badge.Margin = new Thickness(20, 16, 20, 0);
         DockPanel.SetDock(badge, Dock.Top);
         root.Children.Add(badge);
@@ -133,12 +135,18 @@ public sealed class DebugOutputWindow : Window
     }
 
     // Kompaktes Badge: gefüllter Punkt + Text, links oben. Grün = Realtime genutzt, grau = Batch.
-    private static Border MakeSourceBadge(bool usedRealtime)
+    // Hängt – falls bekannt – die Dauer ab Hotkey-Loslassen bis zum Einfügen an („x,xx Sek").
+    private static Border MakeSourceBadge(bool usedRealtime, long elapsedMs)
     {
         var dot = usedRealtime ? SWM.Color.FromRgb(34, 153, 84) : SWM.Color.FromRgb(127, 140, 158);
         var fg = usedRealtime ? SWM.Color.FromRgb(27, 121, 67) : SWM.Color.FromRgb(71, 85, 105);
         var bg = usedRealtime ? SWM.Color.FromRgb(232, 245, 238) : SWM.Color.FromRgb(238, 241, 245);
         var label = usedRealtime ? "Realtime-Transkription" : "Batch-Transkription";
+        if (elapsedMs > 0)
+        {
+            var sec = (elapsedMs / 1000.0).ToString("0.00", new System.Globalization.CultureInfo("de-DE"));
+            label += $"  ·  {sec} Sek";
+        }
 
         var panel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
         panel.Children.Add(new SWS.Ellipse

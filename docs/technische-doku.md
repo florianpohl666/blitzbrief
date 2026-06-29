@@ -93,7 +93,7 @@ flowchart TD
 
 Der GA-Wire-Flow: `session.update` (Typ `transcription`, Modell, Sprache, `prompt`, `turn_detection:null`) → `input_audio_buffer.append` (base64-PCM) → `commit` → Ergebnis-Event `…input_audio_transcription.completed`. Bei jedem Realtime-Fehler fällt `WorkflowRunner` transparent auf den Batch-Upload des gepufferten PCM zurück.
 
-`WorkflowResult.UsedRealtime` hält fest, ob das **finale** Transkript aus dem Realtime-Stream kam (oder ein Batch-(Retry) übernommen hat). Das Debug-Fenster zeigt das oben als Lämpchen (grün = Realtime, grau = Batch).
+`WorkflowResult.UsedRealtime` hält fest, ob das **finale** Transkript aus dem Realtime-Stream kam (oder ein Batch-(Retry) übernommen hat). Das Debug-Fenster zeigt das oben als Lämpchen (grün = Realtime, grau = Batch) samt der Dauer **ab Hotkey-Loslassen bis zum Einfügen** der Antwort im Format „x,xx Sek" (derselbe Stopwatch, der auch die „fertig (… ms)"-Statuszeile speist).
 
 ---
 

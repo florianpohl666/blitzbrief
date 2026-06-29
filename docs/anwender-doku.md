@@ -99,7 +99,7 @@ Beide Modi erledigen automatisch:
 - **Blitzbrief-Kontext** (Strg+Umschalt): nutzt **whisper-1**. Sehr zuverlässige Klein-Fortsetzung, läuft per Upload nach dem Stopp.
 - **Blitzbrief-Kontext (GPT)** (Strg+Leer): nutzt **gpt-4o-transcribe** und gibt dem Modell den Kontext links **und** rechts mit. Streamt live (geringere Latenz). Welches Modell genutzt wird, stellst du in den Einstellungen unter **„Kontext-GPT Modell"** ein – für korrekte Groß-/Kleinschreibung wird **`gpt-4o-transcribe`** empfohlen (das kleinere `gpt-4o-mini-transcribe` schreibt eingefügte Einzelwörter oft groß).
 
-> ℹ️ Im Debug-Fenster zeigt ein Lämpchen oben, ob die Echtzeit-Transkription genutzt wurde (grün) oder auf den klassischen Upload zurückgefallen ist (grau).
+> ℹ️ Im Debug-Fenster zeigt ein Lämpchen oben, ob die Echtzeit-Transkription genutzt wurde (grün) oder auf den klassischen Upload zurückgefallen ist (grau) – und wie lange es ab Loslassen des Hotkeys bis zum Einfügen gedauert hat (z. B. „1,23 Sek").
 
 > ⚠️ Funktioniert am besten in Apps mit guter Textunterstützung (Word, Outlook, Edge/Chrome, Editor). In Apps ohne Textzugriff verhält sich der Modus wie Easy.
 
