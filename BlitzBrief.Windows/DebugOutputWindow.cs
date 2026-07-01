@@ -9,6 +9,8 @@ namespace BlitzBrief.Windows;
 
 public sealed class DebugOutputWindow : Window
 {
+    private static SWM.SolidColorBrush Rgb(byte r, byte g, byte b) => new(SWM.Color.FromRgb(r, g, b));
+
     // Ein Abschnitt im Fenster: Überschrift + Inhalt. Text-Abschnitte bekommen eine
     // scrollbare Textbox (Star-Höhe), Element-Abschnitte ein festes Element (Auto-Höhe).
     private abstract record Section(string Label);
@@ -33,7 +35,7 @@ public sealed class DebugOutputWindow : Window
         ShowInTaskbar = true;
         FontFamily = new SWM.FontFamily("Segoe UI");
         FontSize = 13;
-        Background = new SWM.SolidColorBrush(SWM.Color.FromRgb(245, 247, 250));
+        Background = Rgb(245, 247, 250);
 
         // Abschnitte in Pipeline-Reihenfolge: Cursor-Kontext → Audio-Trim → Transkriptionsstufen.
         var sections = new List<Section>();
@@ -180,10 +182,10 @@ public sealed class DebugOutputWindow : Window
     // Schwellen-Linie und Schnitt-Markierung. Zeichnet bei Größenänderung neu.
     private static FrameworkElement BuildProbabilityGraph(SpeechOnset onset)
     {
-        var gray = new SWM.SolidColorBrush(SWM.Color.FromRgb(176, 186, 199));
-        var blue = new SWM.SolidColorBrush(SWM.Color.FromRgb(41, 121, 196));
-        var red = new SWM.SolidColorBrush(SWM.Color.FromRgb(214, 69, 65));
-        var green = new SWM.SolidColorBrush(SWM.Color.FromRgb(34, 153, 84));
+        var gray = Rgb(176, 186, 199);
+        var blue = Rgb(41, 121, 196);
+        var red = Rgb(214, 69, 65);
+        var green = Rgb(34, 153, 84);
 
         var canvas = new Canvas { Background = SWM.Brushes.White, ClipToBounds = true };
         var probs = onset.Probabilities;
@@ -238,7 +240,7 @@ public sealed class DebugOutputWindow : Window
 
         return new Border
         {
-            BorderBrush = new SWM.SolidColorBrush(SWM.Color.FromRgb(201, 210, 223)),
+            BorderBrush = Rgb(201, 210, 223),
             BorderThickness = new Thickness(1),
             Height = 150,
             Child = canvas
@@ -261,7 +263,7 @@ public sealed class DebugOutputWindow : Window
             FontWeight = FontWeights.SemiBold,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, topMargin, 0, 5),
-            Foreground = new SWM.SolidColorBrush(SWM.Color.FromRgb(23, 32, 42))
+            Foreground = Rgb(23, 32, 42)
         };
     }
 
@@ -274,7 +276,7 @@ public sealed class DebugOutputWindow : Window
             TextWrapping = TextWrapping.Wrap,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Padding = new Thickness(9, 6, 9, 6),
-            BorderBrush = new SWM.SolidColorBrush(SWM.Color.FromRgb(201, 210, 223)),
+            BorderBrush = Rgb(201, 210, 223),
             BorderThickness = new Thickness(1),
             Background = SWM.Brushes.White,
             VerticalContentAlignment = VerticalAlignment.Top

@@ -50,41 +50,33 @@ public sealed class WorkflowRunner(
         var useCommandHints = PromptBuilder.UsesJornCommands(type, settings) && hasEnoughAudio;
         var model = TranscriptionModelFor(type, settings);
 
-        // Transkript besorgen: bevorzugt aus dem Realtime-Stream, sonst per Batch-Upload.
+        // Transkript besorgen: bevorzugt aus dem Realtime-Stream, sonst per Batch-Upload mit dem
+        // workflow-spezifischen Prompt (Kontext-Modus: Vortext am Ende; Kontext-GPT: Lücken-Prompt).
+        // Das führende-Stille-Trimmen (Silero) passiert im Windows-Projekt VOR dieser Stelle.
         // echoPrompt = der Prompt, mit dem das aktuelle Transkript entstanden ist (für die Echo-Prüfung).
         // usedRealtime = kam das finale Transkript aus dem Realtime-Stream (für die Debug-Anzeige).
         var usedRealtime = audio.RealtimeTranscript is not null;
-        string cleaned;
+        string rawText;
         string? echoPrompt;
         if (audio.RealtimeTranscript is not null)
         {
-            cleaned = TranscriptionQualityService.CleanedTranscript(audio.RealtimeTranscript);
+            rawText = audio.RealtimeTranscript;
             echoPrompt = audio.RealtimePrompt;
-
-            // Kontext-GPT auch im Realtime-Pfad gegen Leakage des Lücken-Kontexts absichern.
-            if (type == WorkflowType.BlitzBriefKontextGpt)
-            {
-                cleaned = TranscriptionQualityService.StripLeakedContext(cleaned, audio.PrecedingContext, audio.FollowingContext);
-            }
         }
         else
         {
-            // Kontext-Modus: angefangener Satz links vom Cursor wird an den Prompt gehängt.
-            // Kontext-GPT-Modus: stattdessen Kontext LINKS UND RECHTS mit Einfügelücke (gpt-4o-transcribe
-            // versteht die Beschreibung). Das führende-Stille-Trimmen (Silero) passiert im Windows-Projekt
-            // VOR dieser Stelle – hier kommt bereits beschnittenes PCM an.
-            echoPrompt = type == WorkflowType.BlitzBriefKontextGpt
-                ? PromptBuilder.BuildKontextGapPrompt(type, settings, hasEnoughAudio, audio.PrecedingContext, audio.FollowingContext)
-                : PromptBuilder.BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio, audio.PrecedingContext);
-            var rawText = await TranscribeBatchAsync(audio, apiKey, settings.Language, echoPrompt, model, cancellationToken);
-            cleaned = TranscriptionQualityService.CleanedTranscript(rawText);
+            echoPrompt = PromptBuilder.BuildTranscriptionPrompt(
+                type, settings, hasEnoughAudio, audio.PrecedingContext, audio.FollowingContext);
+            rawText = await TranscribeBatchAsync(audio, apiKey, settings.Language, echoPrompt, model, cancellationToken);
+        }
 
-            // Kontext-GPT: falls das Modell den mitgegebenen Cursor-Kontext mitgeschrieben hat
-            // (Leakage), die durchgesickerten Nachbarwörter an den Rändern entfernen.
-            if (type == WorkflowType.BlitzBriefKontextGpt)
-            {
-                cleaned = TranscriptionQualityService.StripLeakedContext(cleaned, audio.PrecedingContext, audio.FollowingContext);
-            }
+        var cleaned = TranscriptionQualityService.CleanedTranscript(rawText);
+
+        // Kontext-GPT: falls das Modell den mitgegebenen Cursor-Kontext mitgeschrieben hat
+        // (Leakage), die durchgesickerten Nachbarwörter an den Rändern entfernen.
+        if (type == WorkflowType.BlitzBriefKontextGpt)
+        {
+            cleaned = TranscriptionQualityService.StripLeakedContext(cleaned, audio.PrecedingContext, audio.FollowingContext);
         }
 
         // Der Prompt (Eigenbegriffe/Kommando-Hinweise) kann kurze Einzelwörter verbiegen,

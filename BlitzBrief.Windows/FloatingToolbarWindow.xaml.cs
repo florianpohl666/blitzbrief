@@ -1,16 +1,12 @@
-﻿using System.Runtime.InteropServices;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Input;
-using System.Windows.Interop;
 using BlitzBrief.Core.Models;
+using BlitzBrief.Windows.Platform;
 
 namespace BlitzBrief.Windows;
 
 public partial class FloatingToolbarWindow : Window
 {
-    private const int GwlExStyle = -20;
-    private const int WsExNoActivate = 0x08000000;
-
     public event EventHandler<WorkflowType>? WorkflowRequested;
 
     public FloatingToolbarWindow()
@@ -25,40 +21,16 @@ public partial class FloatingToolbarWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        var handle = new WindowInteropHelper(this).Handle;
-        var style = GetWindowLong(handle, GwlExStyle);
-        SetWindowLong(handle, GwlExStyle, style | WsExNoActivate);
+        WindowStyles.MakeNoActivate(this);
     }
 
-    [DllImport("user32.dll")]
-    private static extern int GetWindowLong(IntPtr window, int index);
-
-    [DllImport("user32.dll")]
-    private static extern int SetWindowLong(IntPtr window, int index, int value);
-
-    private void Transcription_Click(object sender, RoutedEventArgs e)
+    // Ein Handler für alle Workflow-Buttons; der Workflow steckt im Tag des Buttons.
+    private void Workflow_Click(object sender, RoutedEventArgs e)
     {
-        WorkflowRequested?.Invoke(this, WorkflowType.Transcription);
-    }
-
-    private void TextImprover_Click(object sender, RoutedEventArgs e)
-    {
-        WorkflowRequested?.Invoke(this, WorkflowType.TextImprover);
-    }
-
-    private void BlitzBriefEasy_Click(object sender, RoutedEventArgs e)
-    {
-        WorkflowRequested?.Invoke(this, WorkflowType.BlitzBriefEasy);
-    }
-
-    private void BlitzBriefKontext_Click(object sender, RoutedEventArgs e)
-    {
-        WorkflowRequested?.Invoke(this, WorkflowType.BlitzBriefKontext);
-    }
-
-    private void Dampf_Click(object sender, RoutedEventArgs e)
-    {
-        WorkflowRequested?.Invoke(this, WorkflowType.DampfAblassen);
+        if (sender is FrameworkElement { Tag: WorkflowType type })
+        {
+            WorkflowRequested?.Invoke(this, type);
+        }
     }
 
     private void Close_Click(object sender, RoutedEventArgs e)

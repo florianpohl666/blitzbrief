@@ -29,6 +29,19 @@ public partial class SettingsWindow : Window
         LoadValues();
     }
 
+    // Zentrale Zuordnung Workflow -> Hotkey-Textbox (Laden, Validieren, Speichern, Zurücksetzen);
+    // die einzige Stelle, die beim Hinzufügen eines Workflows erweitert werden muss.
+    private (WorkflowType Type, System.Windows.Controls.TextBox Box)[] HotkeyBoxes =>
+    [
+        (WorkflowType.Transcription, TranscriptionHotkeyBox),
+        (WorkflowType.TextImprover, TextImproverHotkeyBox),
+        (WorkflowType.BlitzBriefEasy, BlitzBriefEasyHotkeyBox),
+        (WorkflowType.BlitzBriefKontext, KontextHotkeyBox),
+        (WorkflowType.BlitzBriefKontextGpt, KontextGptHotkeyBox),
+        (WorkflowType.DampfAblassen, DampfHotkeyBox),
+        (WorkflowType.EmojiText, EmojiHotkeyBox)
+    ];
+
     private void LoadValues()
     {
         _loading = true;
@@ -48,7 +61,7 @@ public partial class SettingsWindow : Window
             KontextGptModelBox.Text = settings.KontextGptModel;
             HotkeyModeBox.SelectedIndex = settings.HotkeyMode == HotkeyMode.Hold ? 1 : 0;
             AutoPasteBox.IsChecked = settings.AutoPaste;
-DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
+            DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
             DoubleTapModifierBox.SelectedIndex = settings.DoubleTapModifier switch
             {
                 ModifierKey.Alt => 1,
@@ -58,13 +71,11 @@ DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
             PreRollEnabledBox.IsChecked = settings.PreRollEnabled;
             RealtimeBox.IsChecked = settings.UseRealtimeTranscription;
             DebugModeBox.IsChecked = settings.DebugMode;
-            TranscriptionHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.Transcription];
-            TextImproverHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.TextImprover];
-            BlitzBriefEasyHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.BlitzBriefEasy];
-            KontextHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.BlitzBriefKontext];
-            KontextGptHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.BlitzBriefKontextGpt];
-            DampfHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.DampfAblassen];
-            EmojiHotkeyBox.Text = settings.WorkflowHotkeys[WorkflowType.EmojiText];
+            foreach (var (type, box) in HotkeyBoxes)
+            {
+                box.Text = settings.WorkflowHotkeys[type];
+            }
+
             ToneBox.SelectedIndex = settings.TextImprovement.Tone switch
             {
                 TextTone.Formal => 0,
@@ -112,16 +123,8 @@ DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
         {
             CollectSettingsFromUI();
 
-            var hotkeyError = ValidateHotkeys(new Dictionary<WorkflowType, string>
-            {
-                [WorkflowType.Transcription] = TranscriptionHotkeyBox.Text.Trim(),
-                [WorkflowType.TextImprover] = TextImproverHotkeyBox.Text.Trim(),
-                [WorkflowType.BlitzBriefEasy] = BlitzBriefEasyHotkeyBox.Text.Trim(),
-                [WorkflowType.BlitzBriefKontext] = KontextHotkeyBox.Text.Trim(),
-                [WorkflowType.BlitzBriefKontextGpt] = KontextGptHotkeyBox.Text.Trim(),
-                [WorkflowType.DampfAblassen] = DampfHotkeyBox.Text.Trim(),
-                [WorkflowType.EmojiText] = EmojiHotkeyBox.Text.Trim()
-            });
+            var hotkeyError = ValidateHotkeys(
+                HotkeyBoxes.ToDictionary(entry => entry.Type, entry => entry.Box.Text.Trim()));
 
             if (hotkeyError is not null)
             {
@@ -151,7 +154,7 @@ DoubleTapEnabledBox.IsChecked = settings.DoubleTapEnabled;
         settings.KontextGptModel = ModelFromCombo(KontextGptModelBox, "gpt-4o-mini-transcribe");
         settings.HotkeyMode = HotkeyModeBox.SelectedIndex == 1 ? HotkeyMode.Hold : HotkeyMode.Toggle;
         settings.AutoPaste = AutoPasteBox.IsChecked == true;
-settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
+        settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
         settings.DoubleTapModifier = DoubleTapModifierBox.SelectedIndex switch
         {
             1 => ModifierKey.Alt,
@@ -163,13 +166,11 @@ settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
         settings.AudioInputDeviceNumber = MicrophoneBox.SelectedValue is int selectedMicrophone
             ? selectedMicrophone
             : 0;
-        settings.WorkflowHotkeys[WorkflowType.Transcription] = TranscriptionHotkeyBox.Text.Trim();
-        settings.WorkflowHotkeys[WorkflowType.TextImprover] = TextImproverHotkeyBox.Text.Trim();
-        settings.WorkflowHotkeys[WorkflowType.BlitzBriefEasy] = BlitzBriefEasyHotkeyBox.Text.Trim();
-        settings.WorkflowHotkeys[WorkflowType.BlitzBriefKontext] = KontextHotkeyBox.Text.Trim();
-        settings.WorkflowHotkeys[WorkflowType.BlitzBriefKontextGpt] = KontextGptHotkeyBox.Text.Trim();
-        settings.WorkflowHotkeys[WorkflowType.DampfAblassen] = DampfHotkeyBox.Text.Trim();
-        settings.WorkflowHotkeys[WorkflowType.EmojiText] = EmojiHotkeyBox.Text.Trim();
+        foreach (var (type, box) in HotkeyBoxes)
+        {
+            settings.WorkflowHotkeys[type] = box.Text.Trim();
+        }
+
         settings.TextImprovement.Tone = ToneBox.SelectedIndex switch
         {
             0 => TextTone.Formal,
@@ -267,7 +268,7 @@ settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
 
         _captureModifiersPeak |= Keyboard.Modifiers;
 
-        if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin)
+        if (IsModifierKey(key))
         {
             HotkeyHelpText.Text = CountModifiers(Keyboard.Modifiers) >= 2
                 ? "Lasse alle Tasten los, um diese Modifier-Kombination zu speichern, oder drücke noch eine weitere Taste."
@@ -300,7 +301,7 @@ settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
         e.Handled = true;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
 
-        if (key is not (Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin))
+        if (!IsModifierKey(key))
         {
             return;
         }
@@ -326,13 +327,11 @@ settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
     private void ResetHotkeys_Click(object sender, RoutedEventArgs e)
     {
         var defaults = AppSettings.DefaultHotkeys();
-        TranscriptionHotkeyBox.Text = defaults[WorkflowType.Transcription];
-        TextImproverHotkeyBox.Text = defaults[WorkflowType.TextImprover];
-        BlitzBriefEasyHotkeyBox.Text = defaults[WorkflowType.BlitzBriefEasy];
-        KontextHotkeyBox.Text = defaults[WorkflowType.BlitzBriefKontext];
-        KontextGptHotkeyBox.Text = defaults[WorkflowType.BlitzBriefKontextGpt];
-        DampfHotkeyBox.Text = defaults[WorkflowType.DampfAblassen];
-        EmojiHotkeyBox.Text = defaults[WorkflowType.EmojiText];
+        foreach (var (type, box) in HotkeyBoxes)
+        {
+            box.Text = defaults[type];
+        }
+
         HotkeyHelpText.Text = "Standard-Hotkeys wiederhergestellt.";
         _ = AutoSave();
     }
@@ -441,35 +440,37 @@ settings.DoubleTapEnabled = DoubleTapEnabledBox.IsChecked == true;
         return duplicate is null ? null : $"Hotkey doppelt vergeben: {duplicate.Key}";
     }
 
-    private static string? BuildModifierOnlyText(ModifierKeys modifiers)
+    // Gedrückte Modifier als Hotkey-Textteile ("Ctrl", "Alt", …) in kanonischer Reihenfolge.
+    private static List<string> ModifierParts(ModifierKeys modifiers)
     {
         var parts = new List<string>();
         if (modifiers.HasFlag(ModifierKeys.Control)) parts.Add("Ctrl");
         if (modifiers.HasFlag(ModifierKeys.Alt)) parts.Add("Alt");
         if (modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
         if (modifiers.HasFlag(ModifierKeys.Windows)) parts.Add("Win");
+        return parts;
+    }
+
+    private static bool IsModifierKey(Key key) =>
+        key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt
+            or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin;
+
+    private static string? BuildModifierOnlyText(ModifierKeys modifiers)
+    {
+        var parts = ModifierParts(modifiers);
         return parts.Count >= 2 ? string.Join("+", parts) : null;
     }
 
-    private static int CountModifiers(ModifierKeys modifiers) =>
-        (modifiers.HasFlag(ModifierKeys.Control) ? 1 : 0) +
-        (modifiers.HasFlag(ModifierKeys.Alt) ? 1 : 0) +
-        (modifiers.HasFlag(ModifierKeys.Shift) ? 1 : 0) +
-        (modifiers.HasFlag(ModifierKeys.Windows) ? 1 : 0);
+    private static int CountModifiers(ModifierKeys modifiers) => ModifierParts(modifiers).Count;
 
     private static string? BuildHotkeyText(Key key)
     {
-        if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin)
+        if (IsModifierKey(key))
         {
             return null;
         }
 
-        var parts = new List<string>();
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) parts.Add("Ctrl");
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) parts.Add("Alt");
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Windows)) parts.Add("Win");
-
+        var parts = ModifierParts(Keyboard.Modifiers);
         if (parts.Count == 0) return null;
 
         var keyText = KeyToText(key);

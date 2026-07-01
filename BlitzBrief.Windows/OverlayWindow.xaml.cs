@@ -1,20 +1,16 @@
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using BlitzBrief.Windows.Platform;
 using Rectangle = System.Windows.Shapes.Rectangle;
 
 namespace BlitzBrief.Windows;
 
 public partial class OverlayWindow : Window
 {
-    private const int GwlExStyle = -20;
-    private const int WsExNoActivate = 0x08000000;
-    private const int WsExToolWindow = 0x00000080;
-
     private readonly DispatcherTimer meterTimer;
     private readonly DispatcherTimer spinnerTimer;
     private readonly Rectangle[] bars;
@@ -47,9 +43,7 @@ public partial class OverlayWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-        var style = GetWindowLong(handle, GwlExStyle);
-        SetWindowLong(handle, GwlExStyle, style | WsExNoActivate | WsExToolWindow);
+        WindowStyles.MakeNoActivate(this, toolWindow: true);
     }
 
     public void ShowListening(string label)
@@ -130,10 +124,4 @@ public partial class OverlayWindow : Window
     }
 
     private void StopMicBlink() => MicDot.BeginAnimation(OpacityProperty, null);
-
-    [DllImport("user32.dll")]
-    private static extern int GetWindowLong(IntPtr window, int index);
-
-    [DllImport("user32.dll")]
-    private static extern int SetWindowLong(IntPtr window, int index, int value);
 }

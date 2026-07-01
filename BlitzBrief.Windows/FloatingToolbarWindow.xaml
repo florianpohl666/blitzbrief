@@ -1,6 +1,7 @@
 ﻿<Window x:Class="BlitzBrief.Windows.FloatingToolbarWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:models="clr-namespace:BlitzBrief.Core.Models;assembly=BlitzBrief.Core"
         Title="BlitzBrief"
         Width="500"
         Height="54"
@@ -87,25 +88,30 @@
         <Button Content="Diktat"
                 Margin="0,0,3,0"
                 Style="{StaticResource PrimaryToolbarButton}"
-                Click="Transcription_Click" />
+                Tag="{x:Static models:WorkflowType.Transcription}"
+                Click="Workflow_Click" />
         <Button Content="Verbessern"
                 Margin="3,0,3,0"
                 Style="{StaticResource ToolbarButton}"
-                Click="TextImprover_Click" />
+                Tag="{x:Static models:WorkflowType.TextImprover}"
+                Click="Workflow_Click" />
         <Button Content="Easy"
                 Margin="3,0,3,0"
                 Style="{StaticResource ToolbarButton}"
                 ToolTip="Blitzbrief-Easy"
-                Click="BlitzBriefEasy_Click" />
+                Tag="{x:Static models:WorkflowType.BlitzBriefEasy}"
+                Click="Workflow_Click" />
         <Button Content="Kontext"
                 Margin="3,0,3,0"
                 Style="{StaticResource ToolbarButton}"
                 ToolTip="Blitzbrief-Kontext: setzt den angefangenen Satz links vom Cursor fort"
-                Click="BlitzBriefKontext_Click" />
+                Tag="{x:Static models:WorkflowType.BlitzBriefKontext}"
+                Click="Workflow_Click" />
         <Button Content="Beruhigen"
                 Margin="3,0,0,0"
                 Style="{StaticResource ToolbarButton}"
-                Click="Dampf_Click" />
+                Tag="{x:Static models:WorkflowType.DampfAblassen}"
+                Click="Workflow_Click" />
       </UniformGrid>
 
       <Button Grid.Column="1"

@@ -95,16 +95,26 @@ public sealed class TrayController : IDisposable
         }
     }
 
+    // Reihenfolge der Workflow-Einträge im Tray-Menü (weicht von der Enum-Reihenfolge ab).
+    private static readonly WorkflowType[] MenuWorkflows =
+    [
+        WorkflowType.Transcription,
+        WorkflowType.TextImprover,
+        WorkflowType.BlitzBriefEasy,
+        WorkflowType.BlitzBriefKontext,
+        WorkflowType.BlitzBriefKontextGpt,
+        WorkflowType.DampfAblassen,
+        WorkflowType.EmojiText
+    ];
+
     private Forms.ContextMenuStrip BuildMenu()
     {
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("BlitzBrief", null, (_, _) => ToggleWorkflow(WorkflowType.Transcription));
-        menu.Items.Add("Text verbessern", null, (_, _) => ToggleWorkflow(WorkflowType.TextImprover));
-        menu.Items.Add("Blitzbrief-Easy", null, (_, _) => ToggleWorkflow(WorkflowType.BlitzBriefEasy));
-        menu.Items.Add("Blitzbrief-Kontext", null, (_, _) => ToggleWorkflow(WorkflowType.BlitzBriefKontext));
-        menu.Items.Add("Blitzbrief-Kontext (GPT)", null, (_, _) => ToggleWorkflow(WorkflowType.BlitzBriefKontextGpt));
-        menu.Items.Add("Ärger beruhigen", null, (_, _) => ToggleWorkflow(WorkflowType.DampfAblassen));
-        menu.Items.Add("Emoji ergänzen", null, (_, _) => ToggleWorkflow(WorkflowType.EmojiText));
+        foreach (var type in MenuWorkflows)
+        {
+            menu.Items.Add(type.DisplayName(), null, (_, _) => ToggleWorkflow(type));
+        }
+
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Desktop-Leiste anzeigen", null, (_, _) => ShowFloatingToolbar());
         menu.Items.Add("Einstellungen", null, (_, _) => ShowSettings());
@@ -246,7 +256,7 @@ public sealed class TrayController : IDisposable
         if (!speechDetector.Available)
         {
             AppLog.Write("Trim(Silero): Modell nicht verfügbar → kein Trim");
-            return new SpeechTrimInfo(false, new SpeechOnset(false, 0, 0, SileroSpeechDetector.FrameMs, 0.5f, []), 0);
+            return new SpeechTrimInfo(false, SileroSpeechDetector.NoOnset, 0);
         }
 
         var onset = speechDetector.Detect(original, AudioRecorder.SampleRate);
@@ -315,9 +325,8 @@ public sealed class TrayController : IDisposable
             // Dauer beim Start unbekannt -> hasEnoughAudio: true; das Echo bei sehr kurzem Audio fängt
             // der Retry-Pfad im WorkflowRunner ab. Kontext-GPT bekommt den beidseitigen Lücken-Prompt
             // (Kontext wurde zuvor in StartRecording gelesen), sonst den Standard-Prompt.
-            var prompt = type == WorkflowType.BlitzBriefKontextGpt
-                ? PromptBuilder.BuildKontextGapPrompt(type, settings, hasEnoughAudio: true, activeContext, activeSurroundings?.Following)
-                : PromptBuilder.BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio: true);
+            var prompt = PromptBuilder.BuildTranscriptionPrompt(
+                type, settings, hasEnoughAudio: true, activeContext, activeSurroundings?.Following);
             activeSession = realtimeTranscriber.CreateSession(
                 apiKey, model, settings.Language, prompt, AudioRecorder.SampleRate);
             activeSessionPrompt = prompt;

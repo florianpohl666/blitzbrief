@@ -5,14 +5,6 @@ namespace BlitzBrief.Core;
 
 public static class PromptBuilder
 {
-    public const string LegacyDampfAblassenPrompt =
-        "Du erhaeltst ein emotional gesprochenes Transkript. Erkenne zuerst das eigentliche Ziel, Anliegen und den wahren Frust der Person. " +
-        "Formuliere daraus eine klare, respektvolle und wirksame Nachricht, mit der die Person ihr Ziel eher erreicht. " +
-        "Bewahre relevante Fakten, konkrete Probleme, Grenzen, Erwartungen und die noetige Dringlichkeit. " +
-        "Entferne Beleidigungen, Drohungen, Sarkasmus, Unterstellungen und unnoetige Eskalation. " +
-        "Wenn mehrere Vorwuerfe genannt werden, verdichte sie auf die entscheidenden Kernpunkte. " +
-        "Der Ton soll ruhig, menschlich, bestimmt und loesungsorientiert sein. Gib NUR die fertige Nachricht zurueck.";
-
     public const string DefaultDampfAblassenPrompt =
         "Du erhältst ein emotional gesprochenes Transkript. Erkenne zuerst das eigentliche Ziel, Anliegen und den wahren Frust der Person. " +
         "Formuliere daraus eine klare, respektvolle und wirksame Nachricht, mit der die Person ihr Ziel eher erreicht. " +
@@ -28,9 +20,9 @@ public static class PromptBuilder
             return true;
         }
 
+        // Erkennungsmerkmale des alten Prompts: ASCII-Umschreibungen (ae/oe/ue) statt Umlauten.
         var normalized = prompt.Trim();
-        return normalized == LegacyDampfAblassenPrompt ||
-               normalized.Contains("Du erhaeltst ein emotional gesprochenes Transkript", StringComparison.Ordinal) ||
+        return normalized.Contains("Du erhaeltst ein emotional gesprochenes Transkript", StringComparison.Ordinal) ||
                normalized.Contains("noetige Dringlichkeit", StringComparison.Ordinal) ||
                normalized.Contains("loesungsorientiert", StringComparison.Ordinal) ||
                normalized.Contains("Gib NUR die fertige Nachricht zurueck", StringComparison.Ordinal);
@@ -81,10 +73,19 @@ public static class PromptBuilder
     }
 
     /// <summary>
-    /// Baut den Transkriptions-Prompt für einen Workflow. Wird sowohl beim Realtime-Start
-    /// (Dauer noch unbekannt -> hasEnoughAudio: true) als auch im Batch-Fallback (Dauer bekannt)
-    /// genutzt, damit beide Pfade identisch primen.
+    /// Baut den Transkriptions-Prompt für einen Workflow: „Blitzbrief-Kontext (GPT)" bekommt den
+    /// beidseitigen Lücken-Prompt, alle anderen den Whisper-Prompt (ggf. mit Vortext). Wird sowohl
+    /// beim Realtime-Start (Dauer noch unbekannt -> hasEnoughAudio: true) als auch im Batch-Fallback
+    /// (Dauer bekannt) genutzt, damit beide Pfade identisch primen.
     /// </summary>
+    public static string? BuildTranscriptionPrompt(
+        WorkflowType type, AppSettings settings, bool hasEnoughAudio, string? preceding, string? following) =>
+        type == WorkflowType.BlitzBriefKontextGpt
+            ? BuildKontextGapPrompt(type, settings, hasEnoughAudio, preceding, following)
+            : BuildWorkflowWhisperPrompt(type, settings, hasEnoughAudio, preceding);
+
+    /// <summary>Die üblichen Hinweise (Sprache, Eigenbegriffe, Kommandos) plus – im Kontext-Modus –
+    /// der angefangene Satz links vom Cursor ans Prompt-Ende (whisper-1-Fortsetzung).</summary>
     public static string? BuildWorkflowWhisperPrompt(
         WorkflowType type, AppSettings settings, bool hasEnoughAudio, string? precedingSentence = null)
     {
@@ -118,6 +119,10 @@ public static class PromptBuilder
     /// Cursor-Nachbarschaft mit einer Einfügelücke. So sieht das instruktionsfähige
     /// gpt-4o-(mini-)transcribe, wohin das Diktat gehört (links/rechts vom Cursor).
     /// </summary>
+    // Die OpenAI-Realtime-API begrenzt den Transkriptions-Prompt auf 1024 Zeichen; mit Reserve
+    // cappen wir auf 1000. (Gilt nur für den PROMPT/Kontext – Diktat und Transkript sind unbegrenzt.)
+    private const int MaxKontextGapPromptChars = 1000;
+
     public static string? BuildKontextGapPrompt(
         WorkflowType type, AppSettings settings, bool hasEnoughAudio, string? left, string? right)
     {
@@ -134,13 +139,39 @@ public static class PromptBuilder
             return hints;
         }
 
-        var gap =
-            "An der mit ___ markierten Stelle wird gesprochener Text in einen bestehenden Text eingefügt:\n" +
-            $"\"{l} ___ {r}\"\n" +
-            "Transkribiere ausschließlich die Audioaufnahme – den Text, der an die Stelle ___ gehört – " +
-            "wortgetreu auf Deutsch. Gib nur diesen eingefügten Text aus, nicht den umgebenden Kontext.";
+        string Build(string ll, string rr)
+        {
+            var gap =
+                "An der mit ___ markierten Stelle wird gesprochener Text in einen bestehenden Text eingefügt:\n" +
+                $"\"{ll} ___ {rr}\"\n" +
+                "Transkribiere ausschließlich die Audioaufnahme – den Text, der an die Stelle ___ gehört – " +
+                "wortgetreu auf Deutsch. Gib nur diesen eingefügten Text aus, nicht den umgebenden Kontext.";
+            return string.IsNullOrEmpty(hints) ? gap : hints + "\n\n" + gap;
+        }
 
-        return string.IsNullOrEmpty(hints) ? gap : hints + "\n\n" + gap;
+        var prompt = Build(l, r);
+        if (prompt.Length > MaxKontextGapPromptChars)
+        {
+            // Überhang zuerst rechts, dann links kürzen – cursor-nahe Teile behalten (rechts den
+            // Anfang, links das Ende), weil sie die Einfügung am stärksten prägen.
+            var over = prompt.Length - MaxKontextGapPromptChars + 8; // kleine Reserve gegen Trim-Rundung
+            var cutR = Math.Min(over, r.Length);
+            r = (cutR >= r.Length ? "" : r[..(r.Length - cutR)]).TrimEnd();
+            over -= cutR;
+            if (over > 0 && l.Length > 0)
+            {
+                var cutL = Math.Min(over, l.Length);
+                l = (cutL >= l.Length ? "" : l[cutL..]).TrimStart();
+            }
+
+            prompt = Build(l, r);
+            if (prompt.Length > MaxKontextGapPromptChars)
+            {
+                prompt = prompt[..MaxKontextGapPromptChars]; // harte Notbremse
+            }
+        }
+
+        return prompt;
     }
 
     /// <summary>

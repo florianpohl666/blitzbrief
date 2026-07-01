@@ -29,6 +29,9 @@ public sealed class SileroSpeechDetector : IDisposable
 
     public bool Available => session is not null;
 
+    /// <summary>Leeres Onset-Ergebnis (Modell nicht verfügbar oder Inferenzfehler) – kein Trim.</summary>
+    public static SpeechOnset NoOnset { get; } = new(false, 0, 0, FrameMs, 0.5f, []);
+
     public SileroSpeechDetector()
     {
         try
@@ -63,7 +66,7 @@ public sealed class SileroSpeechDetector : IDisposable
     {
         if (session is null)
         {
-            return new SpeechOnset(false, 0, 0, FrameMs, 0.5f, []);
+            return NoOnset;
         }
 
         try
@@ -77,7 +80,7 @@ public sealed class SileroSpeechDetector : IDisposable
         {
             // Inferenzfehler darf das Diktat nie brechen → kein Trim.
             AppLog.Write($"Silero Detect fehlgeschlagen (kein Trim): {ex.Message}");
-            return new SpeechOnset(false, 0, 0, FrameMs, 0.5f, []);
+            return NoOnset;
         }
     }
 

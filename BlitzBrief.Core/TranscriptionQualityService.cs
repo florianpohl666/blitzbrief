@@ -4,43 +4,6 @@ namespace BlitzBrief.Core;
 
 public static class TranscriptionQualityService
 {
-    // Häufige Whisper-Varianten der Kommandowörter → Normalform.
-    // Reihenfolge ist relevant: längere/spezifischere Patterns zuerst.
-    private static readonly (Regex Pattern, string Replacement)[] CommandNormalizations =
-    [
-        (new Regex(@"\bSatz\s+[Ee]nde\b", RegexOptions.Compiled), "Satzende"),
-        (new Regex(@"\bsatzende\b", RegexOptions.Compiled), "Satzende"),
-        (new Regex(@"\bDoppel\s*[Pp]unkt\b", RegexOptions.Compiled), "Doppelpunkt"),
-        (new Regex(@"\bdoppelpunkt\b", RegexOptions.Compiled), "Doppelpunkt"),
-        (new Regex(@"\bkomma\b", RegexOptions.Compiled), "Komma"),
-        (new Regex(@"\bSemikolon\b", RegexOptions.Compiled), "Semikolon"),
-        (new Regex(@"\bsemikolon\b", RegexOptions.Compiled), "Semikolon"),
-        (new Regex(@"\bAusrufezeichen\b", RegexOptions.Compiled), "Ausrufezeichen"),
-        (new Regex(@"\bausrufezeichen\b", RegexOptions.Compiled), "Ausrufezeichen"),
-        (new Regex(@"\bFragezeichen\b", RegexOptions.Compiled), "Fragezeichen"),
-        (new Regex(@"\bfragezeichen\b", RegexOptions.Compiled), "Fragezeichen"),
-        (new Regex(@"\bGedanken\s*[Ss]trich\b", RegexOptions.Compiled), "Gedankenstrich"),
-        (new Regex(@"\bgedankenstrich\b", RegexOptions.Compiled), "Gedankenstrich"),
-        (new Regex(@"\bAnführungszeichen[,\s]+[Aa]uf\b", RegexOptions.Compiled), "Anführungszeichen auf"),
-        (new Regex(@"\bAnführungszeichen[,\s]+[Zz]u\b", RegexOptions.Compiled), "Anführungszeichen zu"),
-        (new Regex(@"\bKlammer[,\s]+[Aa]uf\b", RegexOptions.Compiled), "Klammer auf"),
-        (new Regex(@"\bKlammer[,\s]+[Zz]u\b", RegexOptions.Compiled), "Klammer zu"),
-        (new Regex(@"\bneue[,\s]+[Zz]eile\b", RegexOptions.Compiled), "neue Zeile"),
-        (new Regex(@"\bLeerzeile\b", RegexOptions.Compiled), "Leerzeile"),
-        (new Regex(@"\bleerzeile\b", RegexOptions.Compiled), "Leerzeile"),
-        (new Regex(@"\bneuer[,\s]+[Aa]bsatz\b", RegexOptions.Compiled), "neuer Absatz"),
-        (new Regex(@"\bText[,\s]+[Ee]inrücken\b", RegexOptions.Compiled), "Text einrücken"),
-    ];
-
-    public static string NormalizeCommands(string text)
-    {
-        foreach (var (pattern, replacement) in CommandNormalizations)
-        {
-            text = pattern.Replace(text, replacement);
-        }
-        return text;
-    }
-
     // Kategorie eines Kommandos – bestimmt, welche Whisper-Pausenzeichen rund um
     // das Kommando verschluckt werden und wie das Zielzeichen umrandet wird.
     private enum CommandKind
@@ -67,7 +30,8 @@ public static class TranscriptionQualityService
 
     // Mehrwort-Patterns müssen vor ihren Teilwörtern stehen. Die Sentinels sind
     // Private-Use-Zeichen (U+E000…), damit eingesetzte Zielzeichen nicht im selben
-    // Lauf erneut als Whisper-Padding interpretiert werden.
+    // Lauf erneut als Whisper-Padding interpretiert werden. Getrennt geschriebene
+    // Whisper-Varianten der Komposita ("Satz Ende", "Doppel Punkt") matcht \s* mit.
     private static readonly CommandSpec[] RawCommands =
     [
         new(new Regex(@"\bAnführungszeichen[,\s]+auf\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.OpenBracket,       "\""),
@@ -76,12 +40,12 @@ public static class TranscriptionQualityService
         new(new Regex(@"\bKlammer[,\s]+zu\b",            RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.CloseBracket,      ")"),
         new(new Regex(@"\bneue[,\s]+Zeile\b",            RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.Newline,           "\n"),
         new(new Regex(@"\bText[,\s]+einrücken\b",        RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.Indent,            "    "),
-        new(new Regex(@"\bGedankenstrich\b",             RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.DashPunctuation,   "—"),
-        new(new Regex(@"\bDoppelpunkt\b",                RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.TightPunctuation,  ":"),
+        new(new Regex(@"\bGedanken\s*strich\b",          RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.DashPunctuation,   "—"),
+        new(new Regex(@"\bDoppel\s*punkt\b",             RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.TightPunctuation,  ":"),
         new(new Regex(@"\bSemikolon\b",                  RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.TightPunctuation,  ";"),
         new(new Regex(@"\bAusrufezeichen\b",             RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.TightPunctuation,  "!"),
         new(new Regex(@"\bFragezeichen\b",               RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.TightPunctuation,  "?"),
-        new(new Regex(@"\bSatzende\b",                   RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.TightPunctuation,  "."),
+        new(new Regex(@"\bSatz\s*ende\b",                RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.TightPunctuation,  "."),
         new(new Regex(@"\bLeerzeile\b",                  RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.Newline,           "\n\n"),
         new(new Regex(@"\bneuer[,\s]+Absatz\b",          RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.Newline,           "\n\n"),
         new(new Regex(@"\bKomma\b",                      RegexOptions.Compiled | RegexOptions.IgnoreCase), "", CommandKind.TightPunctuation,  ","),
@@ -112,7 +76,7 @@ public static class TranscriptionQualityService
         };
     }
 
-    public static string ReplaceCommands(string text)
+    public static string ProcessJornCommands(string text)
     {
         // 1. Kommandowörter durch eindeutige Sentinels ersetzen.
         foreach (var c in Commands)
@@ -128,9 +92,6 @@ public static class TranscriptionQualityService
         text = Regex.Replace(text, @"(?<=\S)[ \t]+([,.;:!?)])", "$1"); // Leerzeichen vor schließenden Zeichen
         return text.Trim();
     }
-
-    public static string ProcessJornCommands(string text) =>
-        ReplaceCommands(NormalizeCommands(text));
 
     // "Paragraf"/"Paragraph" und "Euro" schreibt das Transkriptionsmodell mal als
     // Zeichen (§, €), mal als Wort aus. Sobald eine Ziffer im Spiel ist, ist die

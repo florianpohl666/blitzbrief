@@ -32,6 +32,21 @@ public sealed class PromptBuilderTests
     }
 
     [Fact]
+    public void KontextGapPrompt_CapsPromptForRealtimeLimit()
+    {
+        // Realtime-API begrenzt den Prompt auf 1024 Zeichen -> sehr langer Kontext wird getrimmt,
+        // die Lücke bleibt aber erhalten.
+        var settings = new AppSettings();
+        var prompt = PromptBuilder.BuildKontextGapPrompt(
+            WorkflowType.BlitzBriefKontextGpt, settings, hasEnoughAudio: true,
+            new string('a', 900), new string('b', 900));
+
+        Assert.NotNull(prompt);
+        Assert.True(prompt!.Length <= 1024, $"Prompt {prompt.Length} Zeichen > 1024");
+        Assert.Contains("___", prompt);
+    }
+
+    [Fact]
     public void KontextGapPrompt_WithoutAnyContext_FallsBackToHintsOnly()
     {
         var settings = new AppSettings();
@@ -117,7 +132,7 @@ public sealed class PromptBuilderTests
     [Fact]
     public void JornCommandsPrompt_DelegatesCommandReplacementToCode()
     {
-        // Kommando-Ersetzung passiert jetzt in TranscriptionQualityService.ReplaceCommands –
+        // Kommando-Ersetzung passiert jetzt in TranscriptionQualityService.ProcessJornCommands –
         // der GPT-Prompt enthält keine Kommandoliste mehr, aber noch die Kern-Anweisungen.
         var settings = new TextImprovementSettings { Tone = TextTone.JornCommands };
         var prompt = PromptBuilder.BuildTextImprovementPrompt(settings, []);
